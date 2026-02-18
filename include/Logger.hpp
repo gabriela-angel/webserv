@@ -15,9 +15,12 @@ class Logger
 	// LOG LEVELS
 	enum		LogLevel
 	{
-		INFO,
-		ERROR,
-		DEBUG,
+		FATAL,			// For very severe error events that will presumably lead the application to abort immediately
+		CRITICAL,		// For severe error events that will presumably lead the application to abort
+		ERROR,			// For error events that might still allow the application to continue running
+		WARNING,		// For potentially harmful situations that do not cause immediate issues but may require attention
+		INFO,			// For general informational messages about the application's operation
+		DEBUG,			// For development and debugging purposes
 	};
 
   private:
@@ -50,7 +53,10 @@ class Logger
 	static Logger &getInstance();
 
 	// Logging Methods
-	void logInfo(const std::string &message);
-	void logError(const std::string &message);
 	void logDebug(const std::string &message);
+	void logInfo(const std::string &message);
+	void logWarning(const std::string &message);
+	void logError(const std::string &message);
+	void logCritical(const std::string &message);
+	void logFatal(const std::string &message);
 };

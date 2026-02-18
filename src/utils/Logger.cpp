@@ -76,6 +76,12 @@ inline static std::string colorizeMessage(const std::string &dateTime, const std
 		coloredSeverity = COLORIZE(CYAN, severity);
 	else if (severity == "[ERROR]")
 		coloredSeverity = COLORIZE(RED, severity);
+	else if (severity == "[WARNING]")
+		coloredSeverity = COLORIZE(YELLOW, severity);
+	else if (severity == "[CRITICAL]")
+		coloredSeverity = COLORIZE(BRIGHT_RED, severity);
+	else if (severity == "[FATAL]")
+		coloredSeverity = COLORIZE(BRIGHT_RED, severity);
 	else
 		coloredSeverity = severity;
 
@@ -118,5 +124,44 @@ void Logger::logDebug(const std::string &message)
 	std::string coloredMessage = colorizeMessage(dateTime, severity, message);
 	if (_isTerminal(std::cout))
 		std::cout << coloredMessage << std::endl;
+	_logFile << logMessage << std::endl;
+}
+
+void Logger::logWarning(const std::string &message)
+{
+	if (!_initialized) throw std::runtime_error("Logger is not initialized. Call init() before logging.");
+	if (_logLevel < WARNING) return;
+	std::string dateTime = _currentDateTime();
+	std::string severity = "[WARNING]";
+	std::string logMessage = dateTime + " - " + severity + " " + message;
+	std::string coloredMessage = colorizeMessage(dateTime, severity, message);
+	if (_isTerminal(std::cout))
+		std::cout << coloredMessage << std::endl;
+	_logFile << logMessage << std::endl;
+}
+
+void Logger::logCritical(const std::string &message)
+{
+	if (!_initialized) throw std::runtime_error("Logger is not initialized. Call init() before logging.");
+	if (_logLevel < CRITICAL) return;
+	std::string dateTime = _currentDateTime();
+	std::string severity = "[CRITICAL]";
+	std::string logMessage = dateTime + " - " + severity + " " + message;
+	std::string coloredMessage = colorizeMessage(dateTime, severity, message);
+	if (_isTerminal(std::cerr))
+		std::cerr << coloredMessage << std::endl;
+	_logFile << logMessage << std::endl;
+}
+
+void Logger::logFatal(const std::string &message)
+{
+	if (!_initialized) throw std::runtime_error("Logger is not initialized. Call init() before logging.");
+	if (_logLevel < FATAL) return;
+	std::string dateTime = _currentDateTime();
+	std::string severity = "[FATAL]";
+	std::string logMessage = dateTime + " - " + severity + " " + message;
+	std::string coloredMessage = colorizeMessage(dateTime, severity, message);
+	if (_isTerminal(std::cerr))
+		std::cerr << coloredMessage << std::endl;
 	_logFile << logMessage << std::endl;
 }
