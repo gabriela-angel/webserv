@@ -26,13 +26,17 @@ CC := c++
 NAME = webserv
 SRC_PATH = ./src/
 HEADER_PATH = ./include/
+TEMPLATES_PATH = $(HEADER_PATH)./templates/
 BUILD_PATH = ./build/
 LOGS_PATH = ./logs/
 
 UTILS_PATH = ./utils/
+SERVER_PATH = ./server/
 FILES = \
 	main.cpp \
 	$(UTILS_PATH)Logger.cpp \
+	$(SERVER_PATH)Server.cpp \
+	$(SERVER_PATH)EpollManager.cpp \
 
 OBJS = $(addprefix $(BUILD_PATH), $(FILES:%.cpp=%.o))
 
@@ -56,7 +60,7 @@ endif
 
 $(NAME): $(OBJS)
 	@printf "$(YELLOW)[Building]$(RESET) $(NAME)...\n"
-	@$(CC) $(CFLAGS) -o $(NAME) $(OBJS) -I$(HEADER_PATH) -L$(LIB_PATH) -lft $(RFLAGS)
+	@$(CC) $(CFLAGS) -o $(NAME) $(OBJS) -I$(HEADER_PATH) -I$(TEMPLATES_PATH)
 	@printf "$(UP)$(CUT)"
 	@printf "$(GREEN)[Builded]$(RESET) $(NAME)...\n"
 	@printf "$(CYAN)------ ----------------------------------------------- ------$(RESET)\n"
@@ -66,7 +70,7 @@ $(NAME): $(OBJS)
 
 $(BUILD_PATH)%.o: $(SRC_PATH)%.cpp
 	@printf "$(YELLOW)[Compiling]$(RESET) $(notdir $<)...\n"
-	@$(CC) $(CFLAGS) -c $< -o $@ -I$(HEADER_PATH)
+	@$(CC) $(CFLAGS) -c $< -o $@ -I$(HEADER_PATH) -I$(TEMPLATES_PATH)
 	@printf "$(UP)$(CUT)"
 	@printf "$(GREEN)[Compiled]$(RESET) $(notdir $<)...\n"
 
