@@ -69,6 +69,6 @@ bool Server::_listenSocket( void ) {
 		close(_serverSocket);
 		return false;
 	}
-	_logger.logDebug("Listening on port " + to_string(_config.port));
+	_logger.logInfo("Server listening on port " + to_string(_config.port));
 	return true;
 }

@@ -36,7 +36,7 @@ class Server {
 		bool init( void );
 
 		// Getters
-		int getServerSocket() const { return _serverSocket; }
+		int getSocket() const { return _serverSocket; }
 
 	private:
 		bool	_createSocket( void );

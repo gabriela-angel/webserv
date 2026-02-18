@@ -35,8 +35,11 @@ SERVER_PATH = ./server/
 FILES = \
 	main.cpp \
 	$(UTILS_PATH)Logger.cpp \
+	$(UTILS_PATH)HttpRequest.cpp \
 	$(SERVER_PATH)Server.cpp \
 	$(SERVER_PATH)EpollManager.cpp \
+	$(SERVER_PATH)ServerManager.cpp \
+	$(SERVER_PATH)EventLoop.cpp
 
 OBJS = $(addprefix $(BUILD_PATH), $(FILES:%.cpp=%.o))
 
