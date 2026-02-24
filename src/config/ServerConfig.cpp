@@ -120,7 +120,26 @@ void ServerConfig::setRoot(const std::vector<std::string>& value) {
 	_has_root = true;
 }
 
-void ServerConfig::setErrorPage(const std::vector<std::string>& value);
+void ServerConfig::setErrorPage(const std::vector<std::string>& value) {
+	if (value.size() < 2 || value.empty())
+		throw std::runtime_error("Syntax error: error_page directive requires two arguments");
+
+	std::string path = value.back();
+	int code;
+	try {
+		for (size_t i = 0; i < value.size() - 1; ++i) {
+			std::size_t pos;
+			code = std::stoi(value[i], &pos);
+
+			if (pos != value[i].length() || code < 100 || code > 599)
+				throw std::runtime_error("");
+
+			_error_pages[code] = path;
+		}
+	} catch (...) {
+		throw std::runtime_error("Syntax error: error_page directive requires a valid HTTP status code");
+	}
+}
 
 void ServerConfig::setClientMaxBodySize(const std::vector<std::string>& value) {
 	if (_has_client_max_body_size)
@@ -143,7 +162,12 @@ void ServerConfig::setClientMaxBodySize(const std::vector<std::string>& value) {
 	}
 }
 
-bool ServerConfig::isValidPath(const std::string& path);
+bool ServerConfig::isValidPath(const std::string& path) {
+	struct stat info;
+	if (stat(path.c_str(), &info) != 0 || !S_ISDIR(info.st_mode))
+		return false;
+	return true;
+}
 
 const std::vector<int>& ServerConfig::getPort() const {
 	return _port;
@@ -163,9 +187,9 @@ void ServerConfig::setDirective(const std::string& key, const std::vector<std::s
 	std::map<std::string, Setter>::iterator it = _setters.find(key);
 
 	if (it == _setters.end())
-	    throw std::runtime_error("Unknown directive: " + key);
+		throw std::runtime_error("Unknown directive: " + key);
 
-    (this->*(it->second))(value);
+	(this->*(it->second))(value);
 }
 
 void ServerConfig::addLocation(const LocationConfig& location) {

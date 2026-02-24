@@ -13,11 +13,6 @@
 	// duas locations iguais dentro do mesmo server
 	// diretivas repetidas que não deveriam repetir (como dois roots)
 
-// MANTER EM MENTE QUE O PORT PODE SER:
-// listen 127.0.0.1:8080;
-// OU
-// listen 8080;
-
 #ifndef PARSECONFIG_HPP
 # define PARSECONFIG_HPP
 
