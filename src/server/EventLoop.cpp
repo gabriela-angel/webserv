@@ -57,9 +57,9 @@ void EventLoop::run(){
 		{
 			const ClientData &client = it->second;
 			const std::time_t elapsedTime = currentTime - client.lastActivityTime;
-			if (elapsedTime > (client.firstRead ? CLI_FIRST_READ_TIMEOUT : CLI_TIMEOUT))
+			if (elapsedTime > (client.firstRead ? CLI_TIMEOUT : CLI_FIRST_READ_TIMEOUT))
 			{
-				if (client.firstRead)
+				if (!client.firstRead)
 					_logger.logInfo("Client " + to_string(client.clientSocket) + " timed out on first read");
 				else
 					_logger.logInfo("Client " + to_string(client.clientSocket) + " timed out after " + to_string(elapsedTime) + " seconds of inactivity");

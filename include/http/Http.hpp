@@ -21,6 +21,14 @@
 
 #define HTTP_METHODS {"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"}
 
+// Main Headers
+#define HOST "HOST"
+#define CONTENT_LENGTH "CONTENT-LENGTH"
+#define TRANSFER_ENCODING "TRANSFER-ENCODING"
+#define CONNECTION "CONNECTION"
+#define EXPECT "EXPECT"
+#define CONTENT_TYPE "CONTENT-TYPE"
+
 template <typename T>
 struct HttpPart
 {
@@ -56,6 +64,9 @@ class Http {
 
 		static HttpPart<HeaderMap>		_parseHeaders(const std::string &buffer);
 		static void						_validateHeaders(const HeaderMap &headers);
+
+		static HttpPart<std::string>	_parseBody(const std::string &buffer);
+		static void						_validateBody(const std::string &body);
 };
 
 struct HttpData {	
@@ -63,7 +74,24 @@ struct HttpData {
 	Http::HeaderMap headers;
 	std::string body;
 
-	HttpData() : requestLine(), headers(), body("") {}
+	// Main Info
+	std::string host;
+	bool chunkedTransferEncoding;
+	size_t contentLength;
+	bool keepAlive;
+	bool expectContinue;
+
+	HttpData()
+	:
+		requestLine(),
+		headers(),
+		body(""),
+		host(""),
+		chunkedTransferEncoding(false),
+		contentLength(0),
+		keepAlive(false),
+		expectContinue(false)
+	{}
 };
 
 #include "utils.tpp"

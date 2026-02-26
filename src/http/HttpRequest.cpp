@@ -3,6 +3,24 @@
 HttpRequest::HttpRequest() {}
 HttpRequest::~HttpRequest() {}
 
+inline static void fillClientData(ClientData &client) {
+	Http::HeaderMap &headers = client.stateMachine.httpData.headers;
+	StateMachine &stateMachine = client.stateMachine;
+	HttpData &httpData = stateMachine.httpData;
+
+	httpData.host = headers[HOST][0];
+	httpData.chunkedTransferEncoding = headers.count(TRANSFER_ENCODING) > 0;
+	httpData.contentLength = headers.count(CONTENT_LENGTH) > 0 ? from_string<long long>(headers[CONTENT_LENGTH][0]) : 0;
+	httpData.keepAlive = headers.count(CONNECTION) > 0 && headers[CONNECTION][0] == "keep-alive";
+	httpData.expectContinue = headers.count(EXPECT) > 0;
+
+	if (headers.count(CONTENT_LENGTH) > 0 || headers.count(TRANSFER_ENCODING) > 0) {
+		stateMachine.state = READING_BODY;
+	} else {
+		stateMachine.state = DONE;
+	}
+}
+
 void HttpRequest::processClient(ClientData &client) {
 	StateMachine &stateMachine = client.stateMachine;
 	std::string &buffer = stateMachine.buffer;
@@ -25,7 +43,6 @@ void HttpRequest::processClient(ClientData &client) {
 				stateMachine.state = ERROR;	// Transition to error state
 				return;
 			}
-		
 			break;
 		case READING_HEADERS:
 			try {
@@ -35,13 +52,8 @@ void HttpRequest::processClient(ClientData &client) {
 				if (part.size == 0) return;
 				Http::_validateRequestLine(stateMachine.httpData.requestLine);
 				Http::_validateHeaders(part.value);
-
-
-				if (part.value.count("Content-Length") > 0 || part.value.count("Transfer-Encoding") > 0) {
-					stateMachine.state = READING_BODY;
-				} else {
-					stateMachine.state = DONE;
-				}
+				stateMachine.httpData.headers = part.value;
+				fillClientData(client);
 				
 				buffer.erase(0, part.size); // Remove the processed part from the buffer
 
@@ -53,7 +65,14 @@ void HttpRequest::processClient(ClientData &client) {
 			}
 			break;
 		case READING_BODY: 
-			(void)client; // To avoid unused parameter warning, we will implement body reading later
+			try {
+				stateMachine.state = DONE;
+			} catch (HttpException &e) {
+				e._thrown = true;			// Mark the exception as thrown
+				client.exception = e;		// Store the exception in the client data
+				stateMachine.state = ERROR;	// Transition to error state
+				return;
+			}
 			break;
 		default:
 			break;

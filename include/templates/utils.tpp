@@ -27,7 +27,7 @@ std::string to_string(const T& value) {
 template<typename T>
 T from_string(const std::string& str) {
 	std::stringstream ss(str);
-	T value;
+	T value = 0;
 	ss >> value;
 	return value;
 }

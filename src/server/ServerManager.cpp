@@ -89,8 +89,11 @@ void ServerManager::handleRead(int clientSocket)
 	_logger.logDebug("Client " + to_string(client.clientSocket) + " read buffer: \n" + client.stateMachine.buffer);
 	
 	HttpRequest::processClient(client);
-	client.firstRead = true;
-	client.lastActivityTime = std::time(0);
+	if (client.stateMachine.state == DONE)
+	{
+		client.firstRead = true;
+		client.lastActivityTime = std::time(0);
+	}
 }
 
 void ServerManager::removeClient(int clientSocket)

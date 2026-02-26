@@ -171,7 +171,7 @@ void Http::_validateHeaders(const Http::HeaderMap &headers)
 		const HeaderValues &values = it->second;
 
 	/* Validate CONTENT-LENGTH */
-		if (name == "CONTENT-LENGTH") {
+		if (name == CONTENT_LENGTH) {
 			hasContentLength = true;
 			std::string mainValue = values[0];
 
@@ -200,7 +200,7 @@ void Http::_validateHeaders(const Http::HeaderMap &headers)
 		}
 
 	/* Validate TRANSFER-ENCODING */
-		if (name == "TRANSFER-ENCODING") {
+		if (name == TRANSFER_ENCODING) {
 			hasTransferEncoding = true;
 
 			// has only one value and it must be "chunked"
@@ -213,7 +213,7 @@ void Http::_validateHeaders(const Http::HeaderMap &headers)
 		}
 	
 	/* Validate HOST */
-		if (name == "HOST")
+		if (name == HOST)
 		{
 			hasHost = true;
 			if (values.size() != 1)
@@ -262,7 +262,7 @@ void Http::_validateHeaders(const Http::HeaderMap &headers)
 		}
 	
 	/* Validate CONNECTION */
-		if (name == "CONNECTION") {
+		if (name == CONNECTION) {
 			// If we have multiple Connection headers or multiple values, it's a malformed header
 			if (values.size() > 1)
 				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
@@ -273,7 +273,7 @@ void Http::_validateHeaders(const Http::HeaderMap &headers)
 		}
 	
 	/* Validate EXPECT */
-		if (name == "EXPECT") {
+		if (name == EXPECT) {
 			// If we have multiple Expect headers or multiple values, it's a malformed header
 			if (values.size() > 1 || values[0] != "100-continue")
 				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
@@ -284,7 +284,7 @@ void Http::_validateHeaders(const Http::HeaderMap &headers)
 		}
 
 	/* Validate CONTENT-TYPE */
-		if (name == "CONTENT-TYPE") {
+		if (name == CONTENT_TYPE) {
 			if (values.size() != 1)
 				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
 
