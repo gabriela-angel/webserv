@@ -53,7 +53,7 @@ private:
 	void setDirective(const std::string& key, const std::vector<std::string>& value);
 	const std::string& getPathPrefix() const;
 
-	// DEBUIG ONLY
+	// DEBUG ONLY
 	const std::string& getRoot() const { return _root; }
 	const std::vector<std::string>& getMethods() const { return _methods; }
 	const bool& getAutoindex() const { return _autoindex; }
