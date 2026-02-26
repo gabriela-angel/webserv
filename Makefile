@@ -15,8 +15,8 @@ CYAN = \033[36;1;3;208m
 #  =============================== COMPILER ================================
 # ===========================================================================
 
-DEBUGFLAGS := -g3 -pg
-CFLAGS := -Wall -Wextra -Werror -std=c++98
+DEBUGFLAGS := -g3
+CFLAGS := -Wall -Wextra -Werror -std=c++98 $(DEBUGFLAGS)
 VALGRIND_LOG := valgrind.log
 CC := c++
 

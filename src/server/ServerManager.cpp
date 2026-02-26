@@ -85,25 +85,12 @@ void ServerManager::handleRead(int clientSocket)
 	}
 	
 	buffer[bytesRead] = '\0';
-
-
-
-
-
 	client.stateMachine.buffer += std::string(buffer);
-
+	_logger.logDebug("Client " + to_string(client.clientSocket) + " read buffer: \n" + client.stateMachine.buffer);
 	
-	try {
-		HttpRequest::processClient(client);
-		client.firstRead = true;
-		client.lastActivityTime = std::time(0);
-	} catch (const HttpException &e) {
-		// Handle HTTP errors by sending appropriate response and closing connection
-	}
-
-
-
-
+	HttpRequest::processClient(client);
+	client.firstRead = true;
+	client.lastActivityTime = std::time(0);
 }
 
 void ServerManager::removeClient(int clientSocket)

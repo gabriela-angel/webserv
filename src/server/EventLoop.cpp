@@ -22,7 +22,6 @@ void EventLoop::run(){
 		if (_stopFlag) break; // Check if SIGINT was received during epoll_wait
 		if (nfds == -1) throw std::runtime_error("Failed to wait for epoll events");
 
-
 		// Process events
 		for (int i = 0; i < nfds; ++i)
 		{
@@ -43,30 +42,15 @@ void EventLoop::run(){
 			// else if (_events[i].events & EPOLLOUT)
 			// {
 			// 	_logger.logInfo("Ready to write on socket: " + to_string(_events[i].data.fd));
+			//  client.lastActivityTime = std::time(0);
 			// 	_serverManager.handleWrite(_events[i].data.fd);
 			//  // DISCONECT CLIENT AFTER WRITING RESPONSE (IN ERROR CASES)
 			// }
 			
 		}
 
-
-
-
-		// TESTING
-		const std::map<int, ClientData> &clientMap = _serverManager.getClientMap();
-		for (std::map<int, ClientData>::const_iterator it = clientMap.begin(); it != clientMap.end(); ++it)
-		{
-			const ClientData &client = it->second;
-			_logger.logDebug("Client " + to_string(client.clientSocket) + " read buffer: \n" + client.stateMachine.buffer);
-		}
-
-
-
-
-
-
 		// Handle Timeout for clients
-		// const std::map<int, ClientData> &clientMap = _serverManager.getClientMap();
+		const std::map<int, ClientData> &clientMap = _serverManager.getClientMap();
 		std::time_t currentTime = std::time(0);
 		std::vector<int> clientsToRemove;
 		for (std::map<int, ClientData>::const_iterator it = clientMap.begin(); it != clientMap.end(); ++it)
