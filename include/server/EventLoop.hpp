@@ -3,6 +3,7 @@
 #include "EpollManager.hpp"
 #include "ServerManager.hpp"
 #include "Logger.hpp"
+#include <csignal>
 
 #define MAX_EVENTS 64
 

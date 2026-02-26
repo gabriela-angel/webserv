@@ -1,16 +1,25 @@
 #include "EventLoop.hpp"
 
 EventLoop::~EventLoop() {}
-EventLoop::EventLoop(const char *configFilePath) : _logger(Logger::getInstance())
+EventLoop::EventLoop(const char *configFilePath) : _logger(Logger::getInstance()), _serverManager()
 {
 	(void)configFilePath;
 }
 
+std::sig_atomic_t	_stopFlag = 0;
+void handle_sigint(int)
+{
+	Logger::getInstance().logInfo("SIGINT received, shutting down gracefully...");
+	_stopFlag = 1;
+}
+
 void EventLoop::run(){
-	while (true)
+	std::signal(SIGINT, handle_sigint);
+	while (!_stopFlag)
 	{
 		// Waint for events on servers and clients
 		int nfds = epoll_wait(_serverManager.getEpollFD(), _events, MAX_EVENTS, 1000); // 1000 ms timeout
+		if (_stopFlag) break; // Check if SIGINT was received during epoll_wait
 		if (nfds == -1) throw std::runtime_error("Failed to wait for epoll events");
 
 
@@ -59,6 +68,7 @@ void EventLoop::run(){
 		// Handle Timeout for clients
 		// const std::map<int, ClientData> &clientMap = _serverManager.getClientMap();
 		std::time_t currentTime = std::time(0);
+		std::vector<int> clientsToRemove;
 		for (std::map<int, ClientData>::const_iterator it = clientMap.begin(); it != clientMap.end(); ++it)
 		{
 			const ClientData &client = it->second;
@@ -69,12 +79,16 @@ void EventLoop::run(){
 					_logger.logInfo("Client " + to_string(client.clientSocket) + " timed out on first read");
 				else
 					_logger.logInfo("Client " + to_string(client.clientSocket) + " timed out after " + to_string(elapsedTime) + " seconds of inactivity");
-				// Send a 408 Request Timeout response before closing the connection
-				// _serverManager.sendErrorResponse(client.clientSocket, 408);
-				_serverManager.removeClient(client.clientSocket);
+				clientsToRemove.push_back(client.clientSocket);
 				continue;
 			}
 		}
 
+		for (std::vector<int>::iterator it = clientsToRemove.begin(); it != clientsToRemove.end(); ++it)
+		{
+			// Send a 408 Request Timeout response before closing the connection
+			// _serverManager.sendErrorResponse(client.clientSocket, 408);
+			_serverManager.removeClient(*it);
+		}
 	}
 }

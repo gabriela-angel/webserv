@@ -80,6 +80,7 @@ class ServerManager
 	std::map<int, ClientData>	_clientMap;	// <clientSocket, ClientData>
 
   public:
+	typedef std::map<int, ClientData>::iterator ClientIterator;
 	ServerManager();
 	~ServerManager();
 

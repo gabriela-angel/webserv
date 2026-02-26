@@ -27,6 +27,8 @@ ServerManager::ServerManager() : _logger(Logger::getInstance()), _epoll(EpollMan
 }
 ServerManager::~ServerManager()
 {
+	for (ClientIterator it = _clientMap.begin(); it != _clientMap.end(); ++it)
+		close(it->first);
 	for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it)
 		delete *it;
 }
