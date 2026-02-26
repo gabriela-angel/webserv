@@ -10,7 +10,6 @@ class EventLoop
 {
   private:
 	Logger& _logger;
-	EpollManager& _epoll;
 	ServerManager _serverManager;
 	struct epoll_event _events[MAX_EVENTS];
 

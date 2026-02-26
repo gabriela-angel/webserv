@@ -1,11 +1,5 @@
 #include "Logger.hpp"
-#include "Server.hpp"
-#include "EpollManager.hpp"
 #include "EventLoop.hpp"
-
-
-
-
 
 int	main(void)
 {

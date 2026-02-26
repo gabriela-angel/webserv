@@ -14,7 +14,6 @@ inline static std::string inetNtop(uint32_t binary_ip)
 	return ip_stream.str();
 }
 
-
 ServerManager::ServerManager() : _logger(Logger::getInstance()), _epoll(EpollManager::getInstance())
 {
 	Server *newServer = new Server();
@@ -26,6 +25,13 @@ ServerManager::ServerManager() : _logger(Logger::getInstance()), _epoll(EpollMan
 	_servers.push_back(newServer);
 	_epoll.addServer(newServer->getSocket());
 }
+ServerManager::~ServerManager()
+{
+	for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it)
+		delete *it;
+}
+
+
 
 void ServerManager::acceptConnection( int serverSocket ){
 	struct sockaddr_in client_addr;
@@ -38,61 +44,80 @@ void ServerManager::acceptConnection( int serverSocket ){
 		_logger.logDebug("error message: " + std::string(strerror(errno)));
 		return;
 	}
+
+	struct timeval timeout = {2, 0}; // 2 seconds timeout in recv
+	if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
+	{
+		_logger.logError("Error setting socket timeout");
+		_logger.logDebug("error code: " + to_string(errno));
+		_logger.logDebug("error message: " + std::string(strerror(errno)));
+		removeClient(client_socket);
+		return;
+	}
+	
 	_logger.logInfo("Accepted new connection from " + std::string(inetNtop(client_addr.sin_addr.s_addr)) + ":" + to_string(ntohs(client_addr.sin_port)));
 	_epoll.addClient(client_socket, EPOLLIN);
 	_clientMap[client_socket] = ClientData(client_addr, client_socket, serverSocket);
 }
 
-ServerManager::~ServerManager()
-{
-	for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it)
-		delete *it;
-}
+
 
 void ServerManager::handleRead(int clientSocket)
 {
 	ClientData &client = _clientMap[clientSocket];
-	char buffer[4096];
+	char buffer[CLI_BUFFER_SIZE];
 	ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
 	if (bytesRead < 0)
 	{
 		_logger.logError("Error reading from client socket");
-		_clientMap.erase(clientSocket);
-		close(clientSocket);
+		_logger.logDebug("error code: " + to_string(errno));
+		_logger.logDebug("error message: " + std::string(strerror(errno)));
+		removeClient(clientSocket);
 		return;
 	}
 	else if (bytesRead == 0)
 	{
-		_logger.logInfo("Client disconnected");
-		_clientMap.erase(clientSocket);
-		close(clientSocket);
+		_logger.logInfo("Client " + to_string(clientSocket) + " disconnected");
+		removeClient(clientSocket);
 		return;
 	}
 	
 	buffer[bytesRead] = '\0';
-	client.readBuffer += std::string(buffer);
-	HttpRequest::updateState(client);
-	if (client.readState == ERROR)
-	{
-		_logger.logError("Error parsing HTTP request from client... closing connection");
-		_epoll.removeClient(clientSocket);
-		_clientMap.erase(clientSocket);
-		close(clientSocket);
-		return;
+
+
+
+
+
+	client.stateMachine.buffer += std::string(buffer);
+
+	
+	try {
+		HttpRequest::processClient(client);
+		client.firstRead = true;
+		client.lastActivityTime = std::time(0);
+	} catch (const HttpException &e) {
+		// Handle HTTP errors by sending appropriate response and closing connection
 	}
-	
-	
-	if (client.readState == READING)
-	{
-		_logger.logInfo("Partial HTTP request received from client, waiting for more data");
-		return;
-	}
-	
-	
-	if (client.readState == READ_COMPLETE)
-	{
-		_logger.logInfo("Complete HTTP request received from client");
-		_epoll.modifyClient(clientSocket, EPOLLOUT);
-		return;
-	}
+
+
+
+
+}
+
+void ServerManager::removeClient(int clientSocket)
+{
+	_logger.logInfo("Removing client socket: " + to_string(clientSocket));
+	_epoll.removeClient(clientSocket);
+	_clientMap.erase(clientSocket);
+	close(clientSocket);
+}
+
+bool ServerManager::isServerSocket(int sockfd) const
+{
+	return _epoll.isServerSocket(sockfd);
+}
+
+int ServerManager::getEpollFD() const
+{
+	return _epoll.getEpollFD();
 }
