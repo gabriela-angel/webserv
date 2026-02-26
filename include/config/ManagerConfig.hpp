@@ -1,10 +1,10 @@
 #ifndef MANAGERCONFIG_HPP
 # define MANAGERCONFIG_HPP
 
-# include <vector>
-# include <ServerConfig.hpp>
-# include <stdexcept>
 # include <algorithm>
+# include "./config/ServerConfig.hpp"
+# include <stdexcept>
+# include <vector>
 
 class ManagerConfig {
 private:
@@ -17,7 +17,12 @@ public:
 	~ManagerConfig();
 
 	ServerConfig& findServer(int port, const std::string& host_header);
+
+	// DEBUG ONLY
+	const std::vector<ServerConfig>& getServers() const { return _servers; }
 };
+
+std::ostream& operator<<(std::ostream& os, const ManagerConfig& config);
 
 #endif
 

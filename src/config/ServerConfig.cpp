@@ -1,4 +1,5 @@
-#include "ServerConfig.hpp"
+#include "./config/ServerConfig.hpp"
+#include "Logger.hpp"
 
 ServerConfig::ServerConfig(){
 	_has_port = false;
@@ -30,6 +31,7 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other){
 		_error_pages = other._error_pages;
 		_client_max_body_size = other._client_max_body_size;
 		_locations = other._locations;
+		initSetters();
 	}
 	return *this;
 }
@@ -38,9 +40,9 @@ ServerConfig::~ServerConfig(){}
 
 void ServerConfig::initSetters() {
 	_setters["listen"] = &ServerConfig::setListen;
-	_setters["server_name"] = &ServerConfig::setServerName; //missing
-	_setters["root"] = &ServerConfig::setRoot; //missing
-	_setters["error_page"] = &ServerConfig::setErrorPage; //missing
+	_setters["server_name"] = &ServerConfig::setServerName;
+	_setters["root"] = &ServerConfig::setRoot;
+	_setters["error_page"] = &ServerConfig::setErrorPage;
 	_setters["client_max_body_size"] = &ServerConfig::setClientMaxBodySize;
 }
 
@@ -54,12 +56,13 @@ void ServerConfig::setListen(const std::vector<std::string>& value) {
 			size_t colon_pos = value[0].find(':');
 			port_part = value[0].substr(colon_pos + 1);
 			std::string host_part = value[0].substr(0, colon_pos);
-			setHost(std::vector<std::string>(1, host_part));
+			setHost(host_part);
 		}
-		std::size_t pos;
-		unsigned int port = std::stoi(port_part, &pos);
+		char *end;
+		errno = 0;
+		long port = std::strtol(port_part.c_str(), &end, 10);
 
-		if (pos != port_part.length() || port < 1 || port > 65535)
+		if (errno != 0 || *end != '\0' || port < 1 || port > 65535)
 			throw std::runtime_error("");
 
 		_port.push_back(port);
@@ -79,10 +82,11 @@ void ServerConfig::setHost(const std::string& value) {
 			if (octect.empty())
 				throw std::runtime_error("");
 
-			std::size_t pos;
-			int num = std::stoi(octect, &pos);
+			char *end;
+			errno = 0;
+			long num = strtol(octect.c_str(), &end, 10);
 
-			if (pos != octect.length() || num < 0 || num > 255)
+			if (errno != 0 || *end != '\0' || num < 0 || num > 255)
 				throw std::runtime_error("");
 			count++;
 		} catch (...) {
@@ -125,13 +129,14 @@ void ServerConfig::setErrorPage(const std::vector<std::string>& value) {
 		throw std::runtime_error("Syntax error: error_page directive requires two arguments");
 
 	std::string path = value.back();
-	int code;
+	long code;
 	try {
 		for (size_t i = 0; i < value.size() - 1; ++i) {
-			std::size_t pos;
-			code = std::stoi(value[i], &pos);
+			char *end;
+			errno = 0;
+			code = std::strtol(value[i].c_str(), &end, 10);
 
-			if (pos != value[i].length() || code < 100 || code > 599)
+			if (errno != 0 || *end != '\0' || code < 100 || code > 599)
 				throw std::runtime_error("");
 
 			_error_pages[code] = path;
@@ -148,10 +153,11 @@ void ServerConfig::setClientMaxBodySize(const std::vector<std::string>& value) {
 		throw std::runtime_error("Syntax error: client_max_body_size directive requires exactly one argument");
 	
 	try {
-		std::size_t pos;
-		unsigned long size = std::stoul(value[0], &pos);
+		char *end;
+		errno = 0;
+		unsigned long size = std::strtoul(value[0].c_str(), &end, 10);
 
-		if (pos != value[0].length())
+		if (errno != 0 || *end != '\0')
 			throw std::runtime_error("");
 
 		_client_max_body_size = size;
@@ -187,7 +193,7 @@ void ServerConfig::setDirective(const std::string& key, const std::vector<std::s
 	std::map<std::string, Setter>::iterator it = _setters.find(key);
 
 	if (it == _setters.end())
-		throw std::runtime_error("Unknown directive: " + key);
+		throw std::runtime_error("Unknown directive: \'" + key + "\'");
 
 	(this->*(it->second))(value);
 }
@@ -199,4 +205,29 @@ void ServerConfig::addLocation(const LocationConfig& location) {
 	}
 
 	_locations.push_back(location);
+}
+
+// debug
+std::ostream& operator<<(std::ostream& os, const ServerConfig& config) {
+	os << "Host: " << config.getHost() << "\n";
+	os << "Port(s): ";
+	const std::vector<int>& ports = config.getPort();
+	for (size_t i = 0; i < ports.size(); i++) {
+		os << ports[i] << " ";
+	}
+	os << "\n";
+	os << "Server Name: " << config.getServerName() << "\n";
+	os << "Root: " << config.getRoot() << "\n";
+	os << "Client Max Body Size: " << config.getClientMaxBodySize() << "\n";
+	os << "Error Pages:\n";
+	const std::map<int, std::string>& errorPages = config.getErrorPages();
+	for (std::map<int, std::string>::const_iterator it = errorPages.begin(); it != errorPages.end(); ++it) {
+		os << "  " << it->first << ": " << it->second << "\n";
+	}
+	os << "Locations:\n";
+	const std::vector<LocationConfig>& locations = config.getLocations();
+	for (size_t i = 0; i < locations.size(); i++) {
+		os << locations[i];
+	}
+	return os;
 }

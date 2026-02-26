@@ -30,9 +30,14 @@ BUILD_PATH = ./build/
 LOGS_PATH = ./logs/
 
 UTILS_PATH = ./utils/
+CONFIG_PATH = ./config/
 FILES = \
 	main.cpp \
 	$(UTILS_PATH)Logger.cpp \
+	$(CONFIG_PATH)ParseConfig.cpp \
+	$(CONFIG_PATH)ManagerConfig.cpp \
+	$(CONFIG_PATH)ServerConfig.cpp \
+	$(CONFIG_PATH)LocationConfig.cpp \
 
 OBJS = $(addprefix $(BUILD_PATH), $(FILES:%.cpp=%.o))
 

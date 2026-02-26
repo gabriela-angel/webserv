@@ -1,4 +1,4 @@
-#include "LocationConfig.hpp"
+#include "./config/LocationConfig.hpp"
 
 LocationConfig::LocationConfig(const std::vector<std::string>& values) {
 	if (values.size() != 2 || (values[0][0] != '/' || values[1] != "{"))
@@ -29,15 +29,15 @@ LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
 		_path_prefix = other._path_prefix;
 		_has_root = other._has_root;
 		_root = other._root;
-		_allowed_methods = other._allowed_methods;
+		_methods = other._methods;
 		_autoindex = other._autoindex;
 		_index_files = other._index_files;
-		_upload_enabled = other._upload_enabled;
-		_upload_path = other._upload_path;
+		_upload = other._upload;
 		_cgi = other._cgi;
 		_has_redirect = other._has_redirect;
 		_redirect_code = other._redirect_code;
 		_redirect_url = other._redirect_url;
+		initSetters();
 	}
 	return *this;
 }
@@ -116,12 +116,13 @@ void LocationConfig::setRedirect(const std::vector<std::string>& value) {
 	if (value.size() > 2 || value.empty())
 		throw std::runtime_error("Syntax error: return directive requires exactly two arguments");
 	
-	int code;
+	long code;
 	try {
-		std::size_t pos;
-		code = std::stoi(value[0], &pos);
+		char *end;
+		errno = 0;
+		code = std::strtol(value[0].c_str(), &end, 10);
 
-		if (pos != value[0].length() || code < 100 || code > 599)
+		if (errno != 0 || *end != '\0' || code < 100 || code > 599)
 			throw std::runtime_error("");
 	} catch (...) {
 		throw std::runtime_error("Syntax error: return directive requires a valid HTTP redirection status code");
@@ -154,4 +155,41 @@ void LocationConfig::setDirective(const std::string& key, const std::vector<std:
 		throw std::runtime_error("Unknown directive: " + key);
 
 	(this->*(it->second))(value);
+}
+
+const std::string& LocationConfig::getPathPrefix() const {
+	return _path_prefix;
+}
+
+// debug
+std::ostream& operator<<(std::ostream& os, const LocationConfig& config) {
+	os << "  Path Prefix: " << config.getPathPrefix() << "\n";
+	if (config.getHasRedirect()) {
+		os << "  Redirect: " << config.getRedirectCode() << " " << config.getRedirectUrl() << "\n";
+	}
+	os << "  Root: " << config.getRoot() << "\n";
+	os << "  Methods: ";
+	for (size_t i = 0; i < config.getMethods().size(); i++) {
+		os << config.getMethods()[i] << " ";
+	}
+	os << "\n";
+	os << "  Autoindex: " << (config.getAutoindex() ? "on" : "off") << "\n";
+	if (!config.getIndexFiles().empty()) {
+		os << "  Index Files: ";
+		for (size_t i = 0; i < config.getIndexFiles().size(); i++) {
+			os << config.getIndexFiles()[i] << " ";
+		}
+		os << "\n";
+	}
+	if (config.getIsCgi()) {
+		os << "  CGI:\n";
+		const std::map<std::string, std::string>& cgi = config.getCgi();
+		for (std::map<std::string, std::string>::const_iterator it = cgi.begin(); it != cgi.end(); ++it) {
+			os << "    Extension: " << it->first << ", Executable: " << it->second << "\n";
+		}
+	}
+	if (!config.getUpload().empty()) {
+		os << "  Upload: " << config.getUpload() << "\n";
+	}
+	return os;
 }

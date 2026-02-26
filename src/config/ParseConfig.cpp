@@ -1,4 +1,4 @@
-#include "ParseConfig.hpp"
+#include "./config/ParseConfig.hpp"
 
 ParseConfig::ParseConfig(const std::string& filename) : _filename(filename), _line_counter(0), _context(GLOBAL) { }
 
@@ -20,14 +20,15 @@ ParseConfig::~ParseConfig(){}
 std::vector<ServerConfig> ParseConfig::parse() {
 	std::vector<ServerConfig> servers;
 
+	if (_filename.length() < 5 || _filename.substr(_filename.length() - 5) != ".conf")
+		throw std::invalid_argument("Invalid file extension: \"" + _filename + "\". Expected a .conf file.");
 	std::fstream file(_filename.c_str(), std::ios::in);
 	if (!file.is_open())
-		throw std::invalid_argument("Unable to open file: " + _filename);
+		throw std::invalid_argument("Unable to open file: \"" + _filename + "\"");
 	if (file.peek() == std::ifstream::traits_type::eof()) {
 		file.close();
-		throw std::invalid_argument("Empty configuration file: " + _filename);
+		throw std::invalid_argument("Empty configuration file: \"" + _filename + "\"");
 	}
-
 	std::string line;
 
 	while (getline(file, line)) {
@@ -48,7 +49,7 @@ std::vector<ServerConfig> ParseConfig::parse() {
 	
 	if (!file.eof()) {
 		file.close();
-		throw std::runtime_error("Failed to read data from file: " + _filename);
+		throw std::runtime_error("Failed to read data from file: \"" + _filename + "\"");
 	}
 
 	file.close();
@@ -61,12 +62,12 @@ std::vector<ServerConfig> ParseConfig::parse() {
 void ParseConfig::parseDirective(const std::string& key, const std::vector<std::string>& value, std::vector<ServerConfig>& servers) {
 	switch (_context) {
 		case GLOBAL:
-			throw std::runtime_error("Syntax error: line " + std::to_string(_line_counter) + ": Directive '" + key + "' is not allowed in global context");
+			throw std::runtime_error("Syntax error: line " + itoa(_line_counter) + ": Directive '" + key + "' is not allowed in global context");
 		case SERVER:
-			servers.back().setDirective(key, value);
+			servers[servers.size() - 1].setDirective(key, value);
 			break;
 		case LOCATION:
-			servers.back().getLastLocation().setDirective(key, value);
+			servers[servers.size() - 1].getLastLocation().setDirective(key, value);
 			break;
 	}
 }
@@ -74,15 +75,15 @@ void ParseConfig::parseDirective(const std::string& key, const std::vector<std::
 bool ParseConfig::setContext(const std::string& key, const std::vector<std::string>& value, std::vector<ServerConfig>& servers) {
 	if (key == "server") {
 		if (_context != GLOBAL)
-			throw std::runtime_error("Syntax error: line " + std::to_string(_line_counter) + ": 'server' block cannot be nested");
+			throw std::runtime_error("Syntax error: line " + itoa(_line_counter) + ": 'server' block cannot be nested");
 		_context = SERVER;
 		servers.push_back(ServerConfig());
 		return true;
 	} else if (key == "location") {
 		if (_context != SERVER)
-			throw std::runtime_error("Syntax error: line " + std::to_string(_line_counter) + ": 'location' block must be inside a 'server' block");
+			throw std::runtime_error("Syntax error: line " + itoa(_line_counter) + ": 'location' block must be inside a 'server' block");
 		_context = LOCATION;
-		servers.back().addLocation(LocationConfig(value));
+		servers[servers.size() - 1].addLocation(LocationConfig(value));
 		return true;
 	} else if (key == "}") {
 		if (_context == LOCATION)
@@ -90,7 +91,7 @@ bool ParseConfig::setContext(const std::string& key, const std::vector<std::stri
 		else if (_context == SERVER)
 			_context = GLOBAL;
 		else
-			throw std::runtime_error("Syntax error: line " + std::to_string(_line_counter) + ": Unexpected '}'");
+			throw std::runtime_error("Syntax error: line " + itoa(_line_counter) + ": Unexpected '}'");
 		return true;
 	}
 	return false;
@@ -105,12 +106,12 @@ bool ParseConfig::setKeyValue(const std::string& line, std::string& key, std::ve
 
 	iss >> key;
 
-	if (key != "server" && key != "location" && key != "}" && line.back() != ';')
-		throw std::runtime_error("Syntax error: line " + _line_counter + std::string(": Missing ';'"));
+	if (key != "server" && key != "location" && key != "}" && line[line.size() - 1] != ';')
+		throw std::runtime_error("Syntax error: line " + itoa(_line_counter) + ": Missing ';'");
 
 	while (iss >> token) {
-		if (token.back() == ';')
-			token.pop_back();
+		if (token[token.size() - 1] == ';')
+			token.erase(token.size() - 1);
 		if (!token.empty())
 			value.push_back(token);
 	}
@@ -135,7 +136,7 @@ void ParseConfig::cutComments(std::string& line) {
 		}
 	}
 	if (in_single || in_double) {
-		throw std::runtime_error("Invalid syntax: line " + std::to_string(_line_counter) + ": Unclosed quote");
+		throw std::runtime_error("Invalid syntax: line " + itoa(_line_counter) + ": Unclosed quote");
 	}
 }
 
@@ -147,6 +148,11 @@ std::string ParseConfig::trim(const std::string& str) {
 	return str.substr(first, last - first + 1);
 }
 
+std::string ParseConfig::itoa(int num) {
+	std::ostringstream oss;
+	oss << num;
+	return oss.str();
+}
 
 // Arquivo .conf
 //         ↓

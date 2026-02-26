@@ -1,13 +1,15 @@
 #ifndef SERVERCONFIG_HPP
 # define SERVERCONFIG_HPP
 
-# include <vector>
-# include <string>
+# include "./config/LocationConfig.hpp"
+# include <cerrno>
+# include <cstdlib>
 # include <map>
-# include <LocationConfig.hpp>
+# include <string>
 # include <stdexcept>
 # include <sstream>
 # include <sys/stat.h>
+# include <vector>
 
 # define DEFAULT_CLIENT_MAX_BODY_SIZE 1048576 // CHECK MACRO LUIZ LATER
 
@@ -49,6 +51,15 @@ public:
 
 	void setDirective(const std::string& key, const std::vector<std::string>& value);
 	void addLocation(const LocationConfig& location);
+
+	// DEBUG ONLY
+	const std::string& getHost() const { return _host; }
+	const std::string& getRoot() const { return _root; }
+	const std::map<int, std::string>& getErrorPages() const { return _error_pages; }
+	const size_t& getClientMaxBodySize() const { return _client_max_body_size; }
+	const std::vector<LocationConfig>& getLocations() const { return _locations; }
 };
+
+std::ostream& operator<<(std::ostream& os, const ServerConfig& config);
 
 #endif

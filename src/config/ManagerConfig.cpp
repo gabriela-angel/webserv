@@ -1,4 +1,4 @@
-#include "ManagerConfig.hpp"
+#include "./config/ManagerConfig.hpp"
 
 ManagerConfig::ManagerConfig(const std::vector<ServerConfig>& servers) : _servers(servers) {
 	if (_servers.empty())
@@ -30,4 +30,16 @@ ServerConfig& ManagerConfig::findServer(int port, const std::string& host_header
 	if (default_server != -1)
 		return _servers[default_server];
 	throw std::runtime_error("No server listening on this port");
+}
+
+//debug
+std::ostream& operator<<(std::ostream& os, const ManagerConfig& config) {
+	const std::vector<ServerConfig>& servers = config.getServers();
+	for (size_t i = 0; i < servers.size(); i++) {
+		os << "Server " << i + 1 << ":\n";
+		os << servers[i];
+		if (i != servers.size() - 1)
+			os << "\n";
+	}
+	return os;
 }
