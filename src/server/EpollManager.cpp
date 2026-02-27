@@ -45,7 +45,7 @@ void EpollManager::_removeFromEpoll(int sockfd) {
 // ------------------------------ Public Methods ------------------------------
 
 void EpollManager::addClient(int sockfd, uint32_t events) {
-	_addToEpoll(sockfd, events);
+	_addToEpoll(sockfd, EPOLLERR | events);
 }
 
 void EpollManager::addServer(int sockfd) {
@@ -64,7 +64,7 @@ void EpollManager::modifyClient(int sockfd, uint32_t events) {
 	if (isServerSocket(sockfd)) {
 		throw std::runtime_error("Attempted to modify a server socket as a client");
 	}
-	_modifyEpoll(sockfd, events);
+	_modifyEpoll(sockfd, EPOLLERR | events);
 }
 
 bool EpollManager::isServerSocket(int sockfd) const {

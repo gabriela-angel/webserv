@@ -42,7 +42,6 @@ class HttpException : public std::exception {
 			
 
 	public:
-		bool				_thrown;
 		HttpException(void);
 		HttpException(ParseError::Type severity);
 		HttpException(HttpStatus::Code statusCode);
@@ -65,7 +64,7 @@ class HttpException : public std::exception {
 		}
 
 		operator bool() const {
-			return _thrown;
+			return _severity != ParseError::NONE;
 		}
 };
 

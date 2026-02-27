@@ -29,6 +29,7 @@ void HttpRequest::processClient(ClientData &client) {
         if (processClientState(client))
 			break; // if need more data
     }
+	_logger.logDebug("Client " + to_string(client.clientSocket) + " State: " + (sm.state == StateMachine::DONE ? "DONE" : "ERROR"));
 }
 
 // This function will return true if we need to wait for more data
@@ -50,7 +51,6 @@ bool HttpRequest::processClientState(ClientData &client) {
 				buffer.erase(0, part.size); // Remove the processed part from the buffer
 
 			} catch (HttpException &e) {
-				e._thrown = true;			// Mark the exception as thrown
 				client.exception = e;		// Store the exception in the client data
 				stateMachine.state = StateMachine::ERROR;	// Transition to error state
 			}
@@ -70,7 +70,6 @@ bool HttpRequest::processClientState(ClientData &client) {
 				buffer.erase(0, part.size); // Remove the processed part from the buffer
 
 			} catch (HttpException &e) {
-				e._thrown = true;			// Mark the exception as thrown
 				client.exception = e;		// Store the exception in the client data
 				stateMachine.state = StateMachine::ERROR;	// Transition to error state
 			}
@@ -92,7 +91,6 @@ bool HttpRequest::processClientState(ClientData &client) {
 				buffer.erase(0, part.size); // Remove the processed part from the buffer
 
 			} catch (HttpException &e) {
-				e._thrown = true;			// Mark the exception as thrown
 				client.exception = e;		// Store the exception in the client data
 				stateMachine.state = StateMachine::ERROR;	// Transition to error state
 			}

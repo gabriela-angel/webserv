@@ -33,7 +33,15 @@ ServerManager::~ServerManager()
 		delete *it;
 }
 
+// ----------------------------------------- Client Management -----------------------------------------
 
+void ServerManager::removeClient(int clientSocket)
+{
+	_logger.logInfo("Removing client socket: " + to_string(clientSocket));
+	_epoll.removeClient(clientSocket);
+	_clientMap.erase(clientSocket);
+	close(clientSocket);
+}
 
 void ServerManager::acceptConnection( int serverSocket ){
 	struct sockaddr_in client_addr;
@@ -62,8 +70,6 @@ void ServerManager::acceptConnection( int serverSocket ){
 	_clientMap[client_socket] = ClientData(client_addr, client_socket, serverSocket);
 }
 
-
-
 void ServerManager::handleRead(int clientSocket)
 {
 	ClientData &client = _clientMap[clientSocket];
@@ -89,17 +95,26 @@ void ServerManager::handleRead(int clientSocket)
 	_logger.logDebug("Client " + to_string(client.clientSocket) + " read buffer: \n" + client.stateMachine.buffer);
 	
 	HttpRequest::processClient(client);
-	if (client.stateMachine.state == StateMachine::DONE)
+	if (client.stateMachine.state == StateMachine::DONE || client.stateMachine.state == StateMachine::ERROR)
+	{
 		client.stateMachine.updateActivity();
+		_epoll.modifyClient(clientSocket, EPOLLOUT);
+	}
+	
 }
 
-void ServerManager::removeClient(int clientSocket)
+void ServerManager::handleWrite(int clientSocket)
 {
-	_logger.logInfo("Removing client socket: " + to_string(clientSocket));
-	_epoll.removeClient(clientSocket);
-	_clientMap.erase(clientSocket);
-	close(clientSocket);
+	/*
+		TO DO:
+		- Check Exceptions to handle errors
+			- send Response and if shouldClose, remove client
+		- Handle Redirects (3xx)
+		- Handle Keep-Alive (Connection: keep-alive)
+		- Handle Connection Close (Connection: close)
+	*/
 }
+// ------------------------------------------ Utility Methods -----------------------------------------
 
 bool ServerManager::isServerSocket(int sockfd) const
 {

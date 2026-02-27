@@ -26,10 +26,10 @@ class ServerManager
 
 	void	acceptConnection(int serverSocket);
 	void	handleRead(int clientSocket);
+	void	handleWrite(int clientSocket);
 	void	removeClient(int clientSocket);
 	bool	isServerSocket(int sockfd) const;
 	int		getEpollFD() const;
-	// void handleWrite(int clientSocket);
 
 	// Getters
 	const std::vector<Server *> &getServers() const { return _servers; }

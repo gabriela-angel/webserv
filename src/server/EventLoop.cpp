@@ -34,19 +34,27 @@ void EventLoop::run(){
 			
 			// -------------------------------- Client socket events --------------------------------
 
+			// 1️⃣ Check for errors first
+			if (_events[i].events & EPOLLERR)
+			{
+				_logger.logWarning("Error on client socket: " + to_string(_events[i].data.fd));
+				_serverManager.removeClient(_events[i].data.fd);
+				continue;
+			}
+
+			// 2️⃣ Handle readable
 			if (_events[i].events & EPOLLIN)
 			{
 				_logger.logInfo("Data available to read on socket: " + to_string(_events[i].data.fd));
 				_serverManager.handleRead(_events[i].data.fd);
 			}
-			// else if (_events[i].events & EPOLLOUT)
-			// {
-			// 	_logger.logInfo("Ready to write on socket: " + to_string(_events[i].data.fd));
-			//  client.lastActivityTime = std::time(0);
-			// 	_serverManager.handleWrite(_events[i].data.fd);
-			//  // DISCONECT CLIENT AFTER WRITING RESPONSE (IN ERROR CASES)
-			// }
-			
+
+			// 3️⃣ Handle writable
+			if (_events[i].events & EPOLLOUT)
+			{
+				_logger.logInfo("Ready to write on socket: " + to_string(_events[i].data.fd));
+				_serverManager.handleWrite(_events[i].data.fd);
+			}
 		}
 
 		// Handle Timeout for clients
