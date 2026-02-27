@@ -4,8 +4,10 @@
 #include <map>
 #include <vector>
 #include <algorithm>
-#include "HttpException.hpp"
+#include <ctime>
+#include <netinet/in.h>
 
+#include "HttpException.hpp"
 
 #define HTTP_VERSION "HTTP/1.1"
 #define CRLF "\r\n"
@@ -16,6 +18,7 @@
 #define MAX_HEADER_SIZE			16384				// 16 KB
 #define MAX_HEADERS				100					// Maximum number of headers allowed in a request
 #define MAX_BODY_SIZE			10485760			// 10 MB
+#define MAX_CHUNK_SIZE			1048576				// 1 MB
 #define MAX_HOST_LABEL_SIZE		63					// Maximum size of a single label in the Host header
 #define MAX_HOST_SIZE			255					// Maximum size of the entire Host header value
 
@@ -29,17 +32,7 @@
 #define EXPECT "EXPECT"
 #define CONTENT_TYPE "CONTENT-TYPE"
 
-template <typename T>
-struct HttpPart
-{
-	T value;
-	size_t size;
-
-	HttpPart() : value(), size(0) {}
-
-};
-
-struct RequestLine {
+struct	RequestLine {
 	std::string method;
 	std::string uri;
 	std::string version;
@@ -47,16 +40,16 @@ struct RequestLine {
 	RequestLine() : method(""), uri(""), version("") {}
 };
 
-class Http {
+class	Http {
 	public:
 		virtual ~Http() {}
-		typedef std::string HeaderKey;
-		typedef std::vector<std::string> HeaderValues;
-		typedef std::map<HeaderKey, HeaderValues> HeaderMap;
-		typedef HeaderMap::const_iterator ConstHeaderIterator;
-		typedef HeaderMap::iterator HeaderIterator;
-		typedef HeaderValues::const_iterator ConstHeaderValueIterator;
-		typedef HeaderValues::iterator HeaderValueIterator;
+		typedef std::string							HeaderKey;
+		typedef std::vector<std::string>			HeaderValues;
+		typedef std::map<HeaderKey, HeaderValues>	HeaderMap;
+		typedef HeaderMap::const_iterator			ConstHeaderIterator;
+		typedef HeaderMap::iterator					HeaderIterator;
+		typedef HeaderValues::const_iterator		ConstHeaderValueIterator;
+		typedef HeaderValues::iterator				HeaderValueIterator;
 	
 	protected:
 		static HttpPart<RequestLine>	_parseRequestLine(const std::string &buffer);
@@ -65,11 +58,11 @@ class Http {
 		static HttpPart<HeaderMap>		_parseHeaders(const std::string &buffer);
 		static void						_validateHeaders(const HeaderMap &headers);
 
-		static HttpPart<std::string>	_parseBody(const std::string &buffer);
-		static void						_validateBody(const std::string &body);
+		// This function parses the body and validates it according to the headers (Content-Length, Transfer-Encoding, etc.)
+		static HttpPart<std::string>	_parseBody(struct StateMachine &stateMachine);
 };
 
-struct HttpData {	
+struct	HttpData {	
 	RequestLine requestLine;
 	Http::HeaderMap headers;
 	std::string body;
@@ -92,6 +85,74 @@ struct HttpData {
 		keepAlive(false),
 		expectContinue(false)
 	{}
+};
+
+struct	StateMachine
+{
+	enum ReadState
+	{
+		READING_REQUEST_LINE,
+		READING_HEADERS,
+		READING_BODY,
+		DONE,
+		ERROR
+	};
+
+	ReadState		state;
+	std::string		buffer;
+	struct HttpData	httpData;
+	
+	// Timeout data
+	bool			firstReadFlag;
+	std::time_t		lastActivityTime;
+
+	StateMachine() 
+	: 
+		state(READING_REQUEST_LINE),
+		buffer(""),
+		httpData(),
+		firstReadFlag(false),
+		lastActivityTime(std::time(0))
+	{}
+
+	void updateActivity() {
+		if (!firstReadFlag) firstReadFlag = true;
+		lastActivityTime = std::time(0);
+	}
+};
+
+struct	ClientData
+{
+	// Client information
+	int clientSocket;
+	int	serverSocket;
+	struct sockaddr_in client_addr;
+
+	// Client State Machine for parsing HTTP requests
+	StateMachine stateMachine;
+
+	// Client Error ?
+	HttpException exception;
+
+	// Constructors
+	ClientData(const struct sockaddr_in &addr, int clientSocket, int serverSocket)
+	: 
+		clientSocket(clientSocket),
+		serverSocket(serverSocket),
+		client_addr(addr),
+		stateMachine(StateMachine()),
+		exception()
+	{}
+	
+	ClientData()
+	: 
+		clientSocket(-1),
+		serverSocket(-1),
+		client_addr(),
+		stateMachine(),
+		exception()
+	{}
+
 };
 
 #include "utils.tpp"

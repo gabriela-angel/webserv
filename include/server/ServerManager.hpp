@@ -11,66 +11,6 @@
 #define CLI_FIRST_READ_TIMEOUT 5
 #define CLI_TIMEOUT 30
 
-enum ReadState
-{
-	READING_REQUEST_LINE,
-	READING_HEADERS,
-	READING_BODY,
-	DONE,
-	ERROR
-};
-
-struct StateMachine
-{
-	std::string buffer;
-	struct HttpData httpData;
-	ReadState state;
-
-	StateMachine() : buffer(""), httpData(), state(READING_REQUEST_LINE) {};
-};
-
-struct	ClientData
-{
-	// Client information
-	int clientSocket;
-	int	serverSocket;
-	struct sockaddr_in client_addr;
-
-	// Client State Machine for parsing HTTP requests
-	StateMachine stateMachine;
-
-	// Client Timeout data
-	bool firstRead;
-	std::time_t lastActivityTime;
-
-	// Client Error ?
-	HttpException exception;
-
-	// Constructors
-	ClientData(const struct sockaddr_in &addr, int clientSocket, int serverSocket)
-	: 
-		clientSocket(clientSocket),
-		serverSocket(serverSocket),
-		client_addr(addr),
-		stateMachine(StateMachine()),
-		firstRead(false),
-		lastActivityTime(std::time(NULL)),
-		exception()
-	{}
-	
-	ClientData()
-	: 
-		clientSocket(-1),
-		serverSocket(-1),
-		client_addr(),
-		stateMachine(),
-		firstRead(false),
-		lastActivityTime(0),
-		exception()
-	{}
-
-};
-
 class ServerManager
 {
   private:

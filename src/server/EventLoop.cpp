@@ -56,10 +56,11 @@ void EventLoop::run(){
 		for (std::map<int, ClientData>::const_iterator it = clientMap.begin(); it != clientMap.end(); ++it)
 		{
 			const ClientData &client = it->second;
-			const std::time_t elapsedTime = currentTime - client.lastActivityTime;
-			if (elapsedTime > (client.firstRead ? CLI_TIMEOUT : CLI_FIRST_READ_TIMEOUT))
+			const bool isFirstRead = !client.stateMachine.firstReadFlag;
+			const std::time_t elapsedTime = currentTime - client.stateMachine.lastActivityTime;
+			if (elapsedTime > (isFirstRead ? CLI_FIRST_READ_TIMEOUT : CLI_TIMEOUT))
 			{
-				if (!client.firstRead)
+				if (isFirstRead)
 					_logger.logInfo("Client " + to_string(client.clientSocket) + " timed out on first read");
 				else
 					_logger.logInfo("Client " + to_string(client.clientSocket) + " timed out after " + to_string(elapsedTime) + " seconds of inactivity");

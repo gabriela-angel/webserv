@@ -318,3 +318,31 @@ void Http::_validateHeaders(const Http::HeaderMap &headers)
 	if (!hasHost)
 		throw HttpException(HttpException::ParseError::MISSING_HOST_HEADER);
 }
+
+HttpPart<std::string>	Http::_parseBody(StateMachine &stateMachine)
+{
+	const std::string	&buffer = stateMachine.buffer;
+	HttpData			&httpData = stateMachine.httpData;
+
+/* CONTENT-LENGTH */ //
+	if (httpData.contentLength > 0) {
+		if (buffer.size() < httpData.contentLength)
+			return HttpPart<std::string>(); // Wait for more data (Have CLI_TIMEOUT time to receive the body, otherwise close the connection)
+
+		HttpPart<std::string> part;
+		part.value = buffer.substr(0, httpData.contentLength);
+		part.size = httpData.contentLength;
+		return part;
+	}
+
+/* TRANSFER-ENCODING: chunked */
+	if (httpData.chunkedTransferEncoding) {
+		if (buffer.size() > MAX_BODY_SIZE)
+			throw HttpException(HttpException::ParseError::PAYLOAD_TOO_LARGE);
+		
+		// Implement a ChunkStateMachine to parse the chunked body
+		// update client Activity
+	}
+
+	return HttpPart<std::string>(); // No body expected (connection will close in CLI_TIMEOUT seconds)
+}

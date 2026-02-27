@@ -140,3 +140,13 @@ struct Content {
 	};
 
 };
+
+template <typename T>
+struct HttpPart
+{
+	T value;
+	size_t size;
+
+	HttpPart() : value(), size(0) {}
+
+};
