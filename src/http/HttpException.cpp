@@ -5,23 +5,20 @@ HttpException::HttpException() :
 	_statusCode(HttpStatus::BAD_REQUEST),
 	_severity(ParseError::NONE),
 	_shouldClose(false),
-	_message("HTTP Error: Bad Request"),
-	_thrown(false)
+	_message("HTTP Error: Bad Request")
 {}
 
 HttpException::HttpException(HttpStatus::Code statusCode) : 
 	_statusCode(statusCode),
 	_severity(ParseError::NONE),
-	_shouldClose(false),
-	_thrown(false)
+	_shouldClose(false)
 {
 	_message = "HTTP Error: " + to_string(statusCode) + " " + std::string(HttpStatus::reasonPhrase(statusCode));
 }
 
 HttpException::HttpException(ParseError::Type severity) :
 	_severity(severity),
-	_shouldClose(false),
-	_thrown(false)
+	_shouldClose(false)
 {
 	_statusCode = parseErrorToStatusCode(severity);
 	if (severity >= ParseError::INVALID_START_LINE)

@@ -16,6 +16,12 @@ inline static std::string inetNtop(uint32_t binary_ip)
 
 ServerManager::ServerManager() : _logger(Logger::getInstance()), _epoll(EpollManager::getInstance())
 {
+	/*-- Prepare to generate secure session IDs --*/
+	_urandom_fd = open("/dev/urandom", O_RDONLY);
+	if (_urandom_fd < 0)
+		throw std::runtime_error("Failed to open /dev/urandom, cannot generate secure session IDs");
+
+	/*-- Starting Servers --*/
 	Server *newServer = new Server();
 	if (!newServer->init())
 	{
@@ -27,6 +33,7 @@ ServerManager::ServerManager() : _logger(Logger::getInstance()), _epoll(EpollMan
 }
 ServerManager::~ServerManager()
 {
+	close(_urandom_fd);
 	for (ClientIterator it = _clientMap.begin(); it != _clientMap.end(); ++it)
 		close(it->first);
 	for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it)
@@ -34,6 +41,33 @@ ServerManager::~ServerManager()
 }
 
 // ----------------------------------------- Client Management -----------------------------------------
+
+std::string ServerManager::generateSecureSessionId()
+{
+    const size_t byteLength = 16; // 128 bits
+    unsigned char buffer[byteLength];
+
+    ssize_t result = read(_urandom_fd, buffer, byteLength);
+
+    if (result != (ssize_t)byteLength)
+        throw std::runtime_error("Failed to read enough random bytes for session ID generation");
+
+    std::ostringstream oss;
+    for (size_t i = 0; i < byteLength; ++i)
+    {
+        oss << std::hex
+            << std::setw(2)
+            << std::setfill('0')
+            << (int)buffer[i];
+    }
+
+    return oss.str();
+}
+
+void ServerManager::removeSession(const std::string &sessionId)
+{
+	_sessions.erase(sessionId);
+}
 
 void ServerManager::removeClient(int clientSocket)
 {
@@ -99,25 +133,51 @@ void ServerManager::handleRead(int clientSocket)
 	{
 		client.stateMachine.updateActivity();
 		_epoll.modifyClient(clientSocket, EPOLLOUT);
+		_handleSession(client);
 	}
-	
 }
 
 void ServerManager::handleWrite(int clientSocket)
 {
+	ClientData &client = _clientMap[clientSocket];
+	Http::Cookies cookies = client.stateMachine.httpData.cookies;
+	
 	/*
-		TO DO:
-		- Identify Session via cookies
-			- If no session, create Session and set cookie with Set-Cookie header
-				- Set-Cookie: <name>=<value>; Expires=<date>; Max-Age=<seconds>; Domain=<domain>; Path=<path>; Secure; HttpOnly
+		- Session Management
+			- Implement a random feature that uses Sessions (already implemented in clients)
 
 		- Check Exceptions to handle errors
 			- send Response and if shouldClose, remove client
 		- Handle Redirects (3xx)
 		- Handle Keep-Alive (Connection: keep-alive)
-		- Handle Connection Close (Connection: close)
+
+		- send Response with Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
 	*/
 }
+
+void ServerManager::_handleSession(ClientData &client)
+{
+	Http::Cookies &cookies = client.stateMachine.httpData.cookies;
+
+	// if cookie sessionId exists
+	if (cookies.count(SESSIONID) > 0)
+	{
+		// if sessionId refers a valid session
+		if (_sessions.count(cookies[SESSIONID]) > 0)
+		{
+			_logger.logInfo("Client " + to_string(client.clientSocket) + " has valid session: " + cookies[SESSIONID]);
+			client.sessionId = cookies[SESSIONID];
+			return ;
+		}
+	}
+
+	// If the the execution reaches this point, client has no valid session
+	std::string newSessionId = generateSecureSessionId();
+	_sessions[newSessionId] = Session(newSessionId);
+	client.sessionId = newSessionId;
+	_logger.logInfo("Client " + to_string(client.clientSocket) + " assigned new session: " + newSessionId);
+}
+
 // ------------------------------------------ Utility Methods -----------------------------------------
 
 bool ServerManager::isServerSocket(int sockfd) const

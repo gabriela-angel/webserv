@@ -148,18 +148,22 @@ struct	ClientData
 	int	serverSocket;
 	struct sockaddr_in client_addr;
 
+	// Session ID (if any)
+	std::string sessionId;
+	
 	// Client State Machine for parsing HTTP requests
 	StateMachine stateMachine;
-
+	
 	// Client Error ?
 	HttpException exception;
-
+	
 	// Constructors
 	ClientData(const struct sockaddr_in &addr, int clientSocket, int serverSocket)
 	: 
 		clientSocket(clientSocket),
 		serverSocket(serverSocket),
 		client_addr(addr),
+		sessionId(""),
 		stateMachine(StateMachine()),
 		exception()
 	{}
@@ -169,6 +173,7 @@ struct	ClientData
 		clientSocket(-1),
 		serverSocket(-1),
 		client_addr(),
+		sessionId(""),
 		stateMachine(),
 		exception()
 	{}

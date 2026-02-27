@@ -59,8 +59,8 @@ void EventLoop::run(){
 
 		// Handle Timeout for clients
 		const std::map<int, ClientData> &clientMap = _serverManager.getClientMap();
-		std::time_t currentTime = std::time(0);
 		std::vector<int> clientsToRemove;
+		std::time_t currentTime = std::time(0);
 		for (std::map<int, ClientData>::const_iterator it = clientMap.begin(); it != clientMap.end(); ++it)
 		{
 			const ClientData &client = it->second;
@@ -76,12 +76,34 @@ void EventLoop::run(){
 				continue;
 			}
 		}
-
 		for (std::vector<int>::iterator it = clientsToRemove.begin(); it != clientsToRemove.end(); ++it)
-		{
-			// Send a 408 Request Timeout response before closing the connection
-			// _serverManager.sendErrorResponse(client.clientSocket, 408);
 			_serverManager.removeClient(*it);
+		
+
+
+		// Handle Session Cleanup
+		std::vector<std::string> sessionsToRemove;
+		ServerManager::Sessions sessions = _serverManager.getSessions();
+		currentTime = std::time(0);
+		for (ServerManager::SessionIterator it = sessions.begin(); it != sessions.end(); ++it)
+		{
+			const Session &session = it->second;
+			const std::time_t inactivityTime = currentTime - session.lastActivity;
+			const std::time_t lifetime = currentTime - session.createdAt;
+			if (inactivityTime > MAX_SESSION_INACTIVITY)
+			{
+				_logger.logInfo("Session " + session.sessionId + " expired due to inactivity (" + to_string(inactivityTime) + " seconds)");
+				sessionsToRemove.push_back(session.sessionId);
+				continue;
+			}
+			if (lifetime > MAX_SESSION_LIFETIME)
+			{
+				_logger.logInfo("Session " + session.sessionId + " expired due to lifetime (" + to_string(lifetime) + " seconds)");
+				sessionsToRemove.push_back(session.sessionId);
+				continue;
+			}
 		}
+		for (std::vector<std::string>::iterator it = sessionsToRemove.begin(); it != sessionsToRemove.end(); ++it)
+			_serverManager.removeSession(*it);
 	}
 }
