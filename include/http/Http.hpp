@@ -31,6 +31,7 @@
 #define CONNECTION "CONNECTION"
 #define EXPECT "EXPECT"
 #define CONTENT_TYPE "CONTENT-TYPE"
+#define COOKIE "COOKIE"
 
 struct	RequestLine {
 	std::string method;
@@ -43,6 +44,7 @@ struct	RequestLine {
 class	Http {
 	public:
 		virtual ~Http() {}
+		typedef std::map<std::string, std::string>	Cookies;
 		typedef std::string							HeaderKey;
 		typedef std::vector<std::string>			HeaderValues;
 		typedef std::map<HeaderKey, HeaderValues>	HeaderMap;
@@ -63,16 +65,19 @@ class	Http {
 };
 
 struct	HttpData {	
-	RequestLine requestLine;
-	Http::HeaderMap headers;
-	std::string body;
+	RequestLine		requestLine;
+	Http::HeaderMap	headers;
+	std::string		body;
 
 	// Main Info
-	std::string host;
-	bool chunkedTransferEncoding;
-	size_t contentLength;
-	bool keepAlive;
-	bool expectContinue;
+	std::string		host;
+	bool			chunkedTransferEncoding;
+	size_t			contentLength;
+	bool			keepAlive;
+	bool			expectContinue;
+
+	// Cookies
+	Http::Cookies	cookies;
 
 	HttpData()
 	:
@@ -83,12 +88,14 @@ struct	HttpData {
 		chunkedTransferEncoding(false),
 		contentLength(0),
 		keepAlive(false),
-		expectContinue(false)
+		expectContinue(false),
+		cookies()
 	{}
 };
 
 struct	StateMachine
 {
+	// ----- Types -----
 	enum ReadState
 	{
 		READING_REQUEST_LINE,
@@ -98,14 +105,16 @@ struct	StateMachine
 		ERROR
 	};
 
+
+	// ----- Data -----
 	ReadState		state;
 	std::string		buffer;
 	struct HttpData	httpData;
-	
-	// Timeout data
 	bool			firstReadFlag;
 	std::time_t		lastActivityTime;
 
+
+	// ----- Functions -----
 	StateMachine() 
 	: 
 		state(READING_REQUEST_LINE),
@@ -118,6 +127,17 @@ struct	StateMachine
 	void updateActivity() {
 		if (!firstReadFlag) firstReadFlag = true;
 		lastActivityTime = std::time(0);
+	}
+
+	std::string getStateString() const {
+		switch (state) {
+			case READING_REQUEST_LINE: return "READING_REQUEST_LINE";
+			case READING_HEADERS: return "READING_HEADERS";
+			case READING_BODY: return "READING_BODY";
+			case DONE: return "DONE";
+			case ERROR: return "ERROR";
+			default: return "UNKNOWN";
+		}
 	}
 };
 

@@ -107,6 +107,10 @@ void ServerManager::handleWrite(int clientSocket)
 {
 	/*
 		TO DO:
+		- Identify Session via cookies
+			- If no session, create Session and set cookie with Set-Cookie header
+				- Set-Cookie: <name>=<value>; Expires=<date>; Max-Age=<seconds>; Domain=<domain>; Path=<path>; Secure; HttpOnly
+
 		- Check Exceptions to handle errors
 			- send Response and if shouldClose, remove client
 		- Handle Redirects (3xx)

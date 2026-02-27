@@ -26,14 +26,17 @@ void HttpRequest::processClient(ClientData &client) {
     StateMachine &sm = client.stateMachine;
 
     while (sm.state != StateMachine::DONE && sm.state != StateMachine::ERROR) {
-        if (processClientState(client))
+        if (_processClientState(client))
 			break; // if need more data
     }
-	_logger.logDebug("Client " + to_string(client.clientSocket) + " State: " + (sm.state == StateMachine::DONE ? "DONE" : "ERROR"));
+	_logger.logDebug("Client " + to_string(client.clientSocket) + " State: " + sm.getStateString());
+	
+	/* Cookies */
+	_parseCookies(client);
 }
 
 // This function will return true if we need to wait for more data
-bool HttpRequest::processClientState(ClientData &client) {
+bool HttpRequest::_processClientState(ClientData &client) {
 	StateMachine &stateMachine = client.stateMachine;
 	std::string &buffer = stateMachine.buffer;
 
@@ -100,4 +103,29 @@ bool HttpRequest::processClientState(ClientData &client) {
 			break;
 	}
 	return false;
+}
+
+void HttpRequest::_parseCookies(ClientData &client) {
+	HttpData &httpData = client.stateMachine.httpData;
+	HeaderMap &headers = httpData.headers;
+	Cookies &cookies = httpData.cookies;
+
+	if (headers.count(COOKIE) > 0) {
+		const HeaderValues &cookieValues = headers[COOKIE];
+		for (ConstHeaderValueIterator it = cookieValues.begin(); it != cookieValues.end(); ++it) {
+			const std::string &cookieHeader = *it;
+			std::vector<std::string> cookiePairs = split(cookieHeader, ';');
+			for (size_t i = 0; i < cookiePairs.size(); ++i) {
+				std::string &cookiePair = cookiePairs[i];
+				size_t eqPos = cookiePair.find('=');
+				if (eqPos != std::string::npos) {
+					std::string key = trim(cookiePair.substr(0, eqPos));
+					std::string value = trim(cookiePair.substr(eqPos + 1));
+					if (!key.empty()) {
+						cookies[key] = value;
+					}
+				}
+			}
+		}
+	}
 }
