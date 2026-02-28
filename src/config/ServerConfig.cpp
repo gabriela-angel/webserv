@@ -183,10 +183,16 @@ const std::string ServerConfig::getServerName() const {
 	return _server_name;
 }
 
-LocationConfig& ServerConfig::getLastLocation() {
+std::vector<LocationConfig>& ServerConfig::getLocations() {
 	if (_locations.empty())
 		throw std::runtime_error("No locations defined for this server");
-	return _locations.back();
+	return _locations;
+}
+
+const std::vector<LocationConfig>& ServerConfig::getLocations() const {
+	if (_locations.empty())
+		throw std::runtime_error("No locations defined for this server");
+	return _locations;
 }
 
 void ServerConfig::setDirective(const std::string& key, const std::vector<std::string>& value) {

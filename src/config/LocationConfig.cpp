@@ -4,7 +4,10 @@ LocationConfig::LocationConfig(const std::vector<std::string>& values) {
 	if (values.size() != 2 || (values[0][0] != '/' || values[1] != "{"))
 		throw std::runtime_error("Syntax error: Invalid location block definition");
 	
-	_path_prefix = values[0];
+	if (values[0][values[0].length() - 1] == '/')
+		_path_prefix = values[0].substr(0, values[0].length() - 1);
+	else
+		_path_prefix = values[0];
 	_has_root = false;
 	_root = "";
 	_methods.clear();
@@ -159,6 +162,22 @@ void LocationConfig::setDirective(const std::string& key, const std::vector<std:
 
 const std::string& LocationConfig::getPathPrefix() const {
 	return _path_prefix;
+}
+
+const std::vector<std::string>& LocationConfig::getMethods() const {
+	return _methods;
+}
+
+const bool& LocationConfig::getHasRedirect() const {
+	return _has_redirect;
+}
+
+const int& LocationConfig::getRedirectCode() const {
+	return _redirect_code;
+}
+
+const std::string& LocationConfig::getRedirectUrl() const {
+	return _redirect_url;
 }
 
 // debug

@@ -47,7 +47,9 @@ public:
 
 	const std::vector<int>& getPort() const;
 	const std::string getServerName() const;
-	LocationConfig& getLastLocation();
+	std::vector<LocationConfig>& getLocations();
+	const std::vector<LocationConfig>& getLocations() const;
+
 
 	void setDirective(const std::string& key, const std::vector<std::string>& value);
 	void addLocation(const LocationConfig& location);
@@ -57,7 +59,6 @@ public:
 	const std::string& getRoot() const { return _root; }
 	const std::map<int, std::string>& getErrorPages() const { return _error_pages; }
 	const size_t& getClientMaxBodySize() const { return _client_max_body_size; }
-	const std::vector<LocationConfig>& getLocations() const { return _locations; }
 };
 
 std::ostream& operator<<(std::ostream& os, const ServerConfig& config);

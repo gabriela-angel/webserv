@@ -67,7 +67,8 @@ void ParseConfig::parseDirective(const std::string& key, const std::vector<std::
 			servers[servers.size() - 1].setDirective(key, value);
 			break;
 		case LOCATION:
-			servers[servers.size() - 1].getLastLocation().setDirective(key, value);
+			LocationConfig* currentLocation = &servers[servers.size() - 1].getLocations().back();
+			currentLocation->setDirective(key, value);
 			break;
 	}
 }

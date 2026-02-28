@@ -1,5 +1,5 @@
-#ifndef RESPONSE_HPP
-# define RESPONSE_HPP
+#ifndef HTTPRESPONSE_HPP
+# define HTTPRESPONSE_HPP
 
 # include <string>
 # include <map>
@@ -20,7 +20,7 @@ enum HttpStatus {
 	SERVICE_UNAVAILABLE = 503
 };
 
-class Response {
+class HttpResponse {
 private:
 	HttpStatus							_statusCode;
 	std::string							_reasonPhrase;
@@ -28,11 +28,11 @@ private:
 	std::map<std::string, std::string>	_headers;
 	std::string							_body;
 public:
-	Response();
+	HttpResponse();
 	//other constructors
-	Response(const Response& copy);
-	Response& operator=(const Response& other);
-	~Response();
+	HttpResponse(const HttpResponse& copy);
+	HttpResponse& operator=(const HttpResponse& other);
+	~HttpResponse();
 
 	// methods tbd, BUT PROBABLY:
 	void setStatus(HttpStatus status);
