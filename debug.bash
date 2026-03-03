@@ -48,7 +48,7 @@ cat > .vscode/launch.json <<EOF
             "type": "cppdbg",
             "request": "launch",
             "program": "\${workspaceFolder}/$1",
-            "args": [],
+            "args": ["./config/valid/official.conf"],
             "stopAtEntry": false,
             "cwd": "\${workspaceFolder}",
             "environment": [],

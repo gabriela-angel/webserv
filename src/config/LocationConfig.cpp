@@ -1,45 +1,37 @@
 #include "./config/LocationConfig.hpp"
 
-LocationConfig::LocationConfig(const std::vector<std::string>& values) {
+LocationConfig::LocationConfig(const std::vector<std::string>& values) : BaseConfig() {
 	if (values.size() != 2 || (values[0][0] != '/' || values[1] != "{"))
 		throw std::runtime_error("Syntax error: Invalid location block definition");
 	
-	if (values[0][values[0].length() - 1] == '/')
+	if (values[0].length() > 1 && values[0][values[0].length() - 1] == '/')
 		_path_prefix = values[0].substr(0, values[0].length() - 1);
 	else
 		_path_prefix = values[0];
-	_has_root = false;
-	_root = "";
-	_methods.clear();
-	_autoindex = false;
-	_index_files.clear();
 	_upload = "";
 	_is_cgi = false;
 	_cgi.clear();
-	_has_redirect = false;
-	_redirect_code = 0;
-	_redirect_url = "";
 
 	initSetters();
 }
 
-LocationConfig::LocationConfig(const LocationConfig& copy) {
-	*this = copy;
+LocationConfig::LocationConfig(const LocationConfig& copy) : BaseConfig(copy) {
+	_path_prefix = copy._path_prefix;
+	_upload = copy._upload;
+	_is_cgi = copy._is_cgi;
+	_cgi = copy._cgi;
+
+	initSetters();
 }
 
 LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
 	if (this != &other) {
+		BaseConfig::operator=(other);
+
 		_path_prefix = other._path_prefix;
-		_has_root = other._has_root;
-		_root = other._root;
-		_methods = other._methods;
-		_autoindex = other._autoindex;
-		_index_files = other._index_files;
 		_upload = other._upload;
 		_cgi = other._cgi;
-		_has_redirect = other._has_redirect;
-		_redirect_code = other._redirect_code;
-		_redirect_url = other._redirect_url;
+		_is_cgi = other._is_cgi;
 		initSetters();
 	}
 	return *this;
@@ -52,54 +44,17 @@ void LocationConfig::initSetters() {
 	_setters["methods"] = &LocationConfig::setMethods;
 	_setters["autoindex"] = &LocationConfig::setAutoindex;
 	_setters["index"] = &LocationConfig::setIndexFiles;
+	_setters["error_page"] = &LocationConfig::setErrorPage;
 	_setters["upload"] = &LocationConfig::setUpload;
 	_setters["cgi"] = &LocationConfig::setCgi;
 	_setters["return"] = &LocationConfig::setRedirect;
-}
-
-void LocationConfig::setRoot(const std::vector<std::string>& value) {
-	if (_has_root)
-		throw std::runtime_error("Syntax error: root directive is duplicated");
-	if (value.size() != 1)
-		throw std::runtime_error("Syntax error: root directive requires exactly one argument");
-	if (!isValidPath(value[0]))
-		throw std::runtime_error("Syntax error: root directive requires a valid path");
-	_root = value[0];
-	_has_root = true;
-}
-
-void LocationConfig::setMethods(const std::vector<std::string>& value) {
-	if (value.empty())
-		throw std::runtime_error("Syntax error: methods directive requires at least one argument");
-	for (size_t i = 0; i < value.size(); i++) {
-		std::string method = toUpper(value[i]);
-		if (method != "GET" && method != "POST" && method != "DELETE")
-			throw std::runtime_error("Syntax error: methods directive only accepts GET, POST, and DELETE as arguments");
-		_methods.push_back(method);
-	}
-}
-
-void LocationConfig::setAutoindex(const std::vector<std::string>& value) {
-	if (value.size() != 1)
-		throw std::runtime_error("Syntax error: autoindex directive requires exactly one argument");
-	if (value[0] == "on")
-		_autoindex = true;
-	else if (value[0] == "off")
-		_autoindex = false;
-	else
-		throw std::runtime_error("Syntax error: autoindex directive requires 'on' or 'off' as argument");
-}
-
-void LocationConfig::setIndexFiles(const std::vector<std::string>& value) {
-	if (value.empty())
-		throw std::runtime_error("Syntax error: index directive requires at least one argument");
-	_index_files = value;
+	_setters["client_max_body_size"] = &LocationConfig::setClientMaxBodySize;
 }
 
 void LocationConfig::setUpload(const std::vector<std::string>& value) {
 	if (value.size() != 1)
 		throw std::runtime_error("Syntax error: upload directive requires exactly one argument");
-	if (!isValidPath(value[0]))
+	if (!isValidDirectory(value[0]))
 		throw std::runtime_error("Syntax error: upload directive requires a valid path");
 	_upload = value[0];
 }
@@ -107,48 +62,15 @@ void LocationConfig::setUpload(const std::vector<std::string>& value) {
 void LocationConfig::setCgi(const std::vector<std::string>& value) {
 	if (value.size() != 2)
 		throw std::runtime_error("Syntax error: cgi directive requires exactly two arguments");
-	if (value[0][0] != '.')
+	if (value[0].length() < 2 || value[0][0] != '.')
 		throw std::runtime_error("Syntax error: cgi directive requires a file extension as the first argument");
-	if (!isValidPath(value[1]))
-		throw std::runtime_error("Syntax error: cgi directive requires a valid directory as the second argument");
+	struct stat info;
+	if (stat(value[1].c_str(), &info) != 0 || !S_ISREG(info.st_mode) || access(value[1].c_str(), X_OK) != 0)
+		throw std::runtime_error("Syntax error: cgi directive requires a valid executable path as the second argument");
+	if (_cgi.find(value[0]) != _cgi.end())
+		throw std::runtime_error("Syntax error: cgi directive has duplicate file extension");
 	_is_cgi = true;
 	_cgi[value[0]] = value[1];
-}
-
-void LocationConfig::setRedirect(const std::vector<std::string>& value) {
-	if (value.size() > 2 || value.empty())
-		throw std::runtime_error("Syntax error: return directive requires exactly two arguments");
-	
-	long code;
-	try {
-		char *end;
-		errno = 0;
-		code = std::strtol(value[0].c_str(), &end, 10);
-
-		if (errno != 0 || *end != '\0' || code < 100 || code > 599)
-			throw std::runtime_error("");
-	} catch (...) {
-		throw std::runtime_error("Syntax error: return directive requires a valid HTTP redirection status code");
-	}
-
-	_has_redirect = true;
-	_redirect_code = code;
-	if (value.size() == 2)
-		_redirect_url = value[1];
-}
-
-std::string LocationConfig::toUpper(std::string str)
-{
-	for (size_t i = 0; i < str.length(); i++)
-		str[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(str[i])));
-	return str;
-}
-
-bool LocationConfig::isValidPath(const std::string& path) {
-	struct stat info;
-	if (stat(path.c_str(), &info) != 0 || !S_ISDIR(info.st_mode))
-		return false;
-	return true;
 }
 
 void LocationConfig::setDirective(const std::string& key, const std::vector<std::string>& value) {
@@ -162,22 +84,6 @@ void LocationConfig::setDirective(const std::string& key, const std::vector<std:
 
 const std::string& LocationConfig::getPathPrefix() const {
 	return _path_prefix;
-}
-
-const std::vector<std::string>& LocationConfig::getMethods() const {
-	return _methods;
-}
-
-const bool& LocationConfig::getHasRedirect() const {
-	return _has_redirect;
-}
-
-const int& LocationConfig::getRedirectCode() const {
-	return _redirect_code;
-}
-
-const std::string& LocationConfig::getRedirectUrl() const {
-	return _redirect_url;
 }
 
 // debug

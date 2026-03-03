@@ -19,12 +19,12 @@ ManagerConfig::~ManagerConfig() {}
 ServerConfig& ManagerConfig::findServer(int port, const std::string& host_header) {
 	int default_server = -1;
 	for (size_t i = 0; i < _servers.size(); i++) {
-		const std::vector<int>& ports = _servers[i].getPort();
-		if (std::find(ports.begin(), ports.end(), port) != ports.end()) {
-			if (default_server == -1)
-				default_server = static_cast<int>(i);
-			if (_servers[i].getServerName() == host_header)
+		if (_servers[i].listensOnPort(port)) {
+			const std::vector<std::string>& server_names = _servers[i].getServerName();
+			if (std::find(server_names.begin(), server_names.end(), host_header) != server_names.end())
 				return _servers[i];
+			if (default_server == -1)
+				default_server = i;
 		}
 	}
 	if (default_server != -1)

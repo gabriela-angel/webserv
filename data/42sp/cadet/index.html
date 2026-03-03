@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>42sp - New Cadet</title>
+	<link rel="stylesheet" href="../style.css">
+	<link href="https://fonts.googleapis.com/css2?family=Science+Gothic&display=swap" rel="stylesheet">
+</head>
+
+<body class="bg">
+	<div class="container">
+		<p class="title">Cadet Registry</p>
+		<p class="subtitle">Create or Remove cadets</p>
+	
+		<form action="./cadet_create.py" method="POST" enctype="multipart/form-data" class="cadet-form">
+			<input 
+				type="text"
+				name="name"
+				placeholder="Cadet name"
+				maxlength="50"
+                pattern="[A-Za-z0-9\s\-]+"
+				required />
+			<input 
+				type="file"
+				name="photo"
+				accept="image/jpeg,image/png,image/gif,image/webp"
+				required />
+			<button class="btn" type="submit">Add Cadet</button>
+		</form>
+
+		<div style="margin-top: 100px;">
+			<button id="cadets_uploads">AutoIndex Cadets List</button>
+			<button id="cadets_list">Dynamic Cadets List</button>
+		</div>
+	</div>
+	<script src="../script.js"></script>
+
+</body>
+</html>

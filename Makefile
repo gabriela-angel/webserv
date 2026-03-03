@@ -38,6 +38,7 @@ FILES = \
 	$(CONFIG_PATH)ManagerConfig.cpp \
 	$(CONFIG_PATH)ServerConfig.cpp \
 	$(CONFIG_PATH)LocationConfig.cpp \
+	$(CONFIG_PATH)BaseConfig.cpp \
 
 OBJS = $(addprefix $(BUILD_PATH), $(FILES:%.cpp=%.o))
 
