@@ -136,7 +136,7 @@ bool ServerConfig::listensOnPort(int port) const {
 	return it != _listen.end();
 }
 
-const std::vector<std::string> ServerConfig::getServerName() const {
+const std::vector<std::string>& ServerConfig::getServerName() const {
 	return _server_name;
 }
 
