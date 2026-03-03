@@ -32,7 +32,7 @@ public:
 
 	// DEBUG ONLY FOR PORTPAIR
 	const std::map<int, std::string>& getPortPair() const;
-	const std::vector<std::string> getServerName() const;
+	const std::vector<std::string>& getServerName() const;
 	std::vector<LocationConfig>& getLocations();
 	const std::vector<LocationConfig>& getLocations() const;
 
