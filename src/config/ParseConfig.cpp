@@ -30,21 +30,35 @@ std::vector<ServerConfig> ParseConfig::parse() {
 		throw std::invalid_argument("Empty configuration file: \"" + _filename + "\"");
 	}
 	std::string line;
+	std::string remainder;
 
-	while (getline(file, line)) {
+	while (getline(file, remainder)) {
 		_line_counter++;
 
-		cutComments(line);
-		line = trim(line);
+		cutComments(remainder);
+		remainder = trim(remainder);
+		while (!remainder.empty()) {
+			size_t pos = remainder.find_first_of(";{}");
+			if (pos != (remainder.length() - 1)) {
+				line = remainder.substr(0, pos + 1);
+				remainder = remainder.substr(pos + 1);
+			}
+			else {
+				line = remainder;
+				remainder = "";
+			}
 
-		std::string key;
-		std::vector<std::string> value;
-		if(!setKeyValue(line, key, value))
-			continue;
+			line = trim(line);
 
-		if (setContext(key, value, servers))
-			continue;
-		parseDirective(key, value, servers);
+			std::string key;
+			std::vector<std::string> value;
+			if(!setKeyValue(line, key, value))
+				continue;
+
+			if (setContext(key, value, servers))
+				continue;
+			parseDirective(key, value, servers);
+		}
 	}
 	
 	if (!file.eof()) {
