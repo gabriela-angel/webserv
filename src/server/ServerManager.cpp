@@ -140,7 +140,21 @@ void ServerManager::handleRead(int clientSocket)
 void ServerManager::handleWrite(int clientSocket)
 {
 	ClientData &client = _clientMap[clientSocket];
-	Http::Cookies cookies = client.stateMachine.httpData.cookies;
+	HttpData &httpData = client.stateMachine.httpData;
+	
+ 	ResponseData responseData;
+
+	responseData.method = httpData.requestLine.method;
+	responseData.HTTPVersion = httpData.requestLine.version;
+	responseData.uri = httpData.requestLine.uri;
+	responseData.host = httpData.host;
+	responseData.headers = httpData.headers;
+	if (responseData.method == "POST" || responseData.method == "PUT")
+		responseData.body = httpData.body;
+	responseData.exception = client.exception;
+
+	// HttpResponse parseResponse(responseData)
+	// Add Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
 	
 	/*
 		- Session Management
@@ -148,11 +162,12 @@ void ServerManager::handleWrite(int clientSocket)
 
 		- Check Exceptions to handle errors
 			- send Response and if shouldClose, remove client
-		- Handle Redirects (3xx)
 		- Handle Keep-Alive (Connection: keep-alive)
 
 		- send Response with Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
 	*/
+
+	
 }
 
 void ServerManager::_handleSession(ClientData &client)

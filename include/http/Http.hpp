@@ -13,15 +13,6 @@
 #define CRLF "\r\n"
 #define HEADER_END CRLF CRLF
 
-#define MAX_URI_SIZE			16384				// 16 KB
-#define MAX_REQUEST_LINE_SIZE	(MAX_URI_SIZE + 20)	// Method + Version + Spaces
-#define MAX_HEADER_SIZE			16384				// 16 KB
-#define MAX_HEADERS				100					// Maximum number of headers allowed in a request
-#define MAX_BODY_SIZE			10485760			// 10 MB
-#define MAX_CHUNK_SIZE			1048576				// 1 MB
-#define MAX_HOST_LABEL_SIZE		63					// Maximum size of a single label in the Host header
-#define MAX_HOST_SIZE			255					// Maximum size of the entire Host header value
-
 #define HTTP_METHODS {"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"}
 
 // Main Headers
@@ -32,14 +23,6 @@
 #define EXPECT "EXPECT"
 #define CONTENT_TYPE "CONTENT-TYPE"
 #define COOKIE "COOKIE"
-
-struct	RequestLine {
-	std::string method;
-	std::string uri;
-	std::string version;
-
-	RequestLine() : method(""), uri(""), version("") {}
-};
 
 class	Http {
 	public:
@@ -52,16 +35,14 @@ class	Http {
 		typedef HeaderMap::iterator					HeaderIterator;
 		typedef HeaderValues::const_iterator		ConstHeaderValueIterator;
 		typedef HeaderValues::iterator				HeaderValueIterator;
-	
-	protected:
-		static HttpPart<RequestLine>	_parseRequestLine(const std::string &buffer);
-		static void						_validateRequestLine(const RequestLine &requestLine);
+};
 
-		static HttpPart<HeaderMap>		_parseHeaders(const std::string &buffer);
-		static void						_validateHeaders(const HeaderMap &headers);
+struct	RequestLine {
+	std::string method;
+	std::string uri;
+	std::string version;
 
-		// This function parses the body and validates it according to the headers (Content-Length, Transfer-Encoding, etc.)
-		static HttpPart<std::string>	_parseBody(struct StateMachine &stateMachine);
+	RequestLine() : method(""), uri(""), version("") {}
 };
 
 struct	HttpData {	

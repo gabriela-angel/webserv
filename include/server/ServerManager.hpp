@@ -31,6 +31,17 @@ struct Session
 	Session() : sessionId(""), createdAt(std::time(NULL)), lastActivity(std::time(NULL)) {}
 };
 
+struct ResponseData {
+	std::string method;
+	std::string HTTPVersion;
+	std::string uri;
+	std::string host;
+	Http::HeaderMap headers;
+	std::string body;
+	
+	HttpException exception;
+};
+
 class ServerManager
 {
   public:

@@ -42,7 +42,6 @@ FILES = \
 	main.cpp \
 	$(UTILS_PATH)Logger.cpp \
 	$(HTTP_PATH)HttpRequest.cpp \
-	$(HTTP_PATH)Http.cpp \
 	$(HTTP_PATH)HttpException.cpp \
 	$(SERVER_PATH)Server.cpp \
 	$(SERVER_PATH)EpollManager.cpp \
