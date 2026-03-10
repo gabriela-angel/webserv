@@ -44,7 +44,7 @@ void ServerConfig::initSetters() {
 }
 
 void ServerConfig::setListen(const std::vector<std::string>& value) {
-	if (value.size() != 1)
+	if (value.size() != 1 && value.size() != 2)
 		throw std::runtime_error("Syntax error: listen directive requires exactly one argument");
 
 	try {
@@ -62,15 +62,24 @@ void ServerConfig::setListen(const std::vector<std::string>& value) {
 		if (errno != 0 || *end != '\0' || port < 1 || port > 65535)
 			throw std::runtime_error("");
 
-		setHost(host_part, static_cast<int>(port));
+		ListenDirective directive = {"", static_cast<int>(port), false};
+		if (value.size() == 2) {
+			if (value[1] != "default_server")
+				throw std::runtime_error("Syntax error: invalid argument '" + value[1] + "' for listen directive");
+			directive.default_server = true;
+		}
+		setHost(host_part, directive);
+		_listen.push_back(directive);
 	} catch (...) {
 		throw std::runtime_error("Syntax error: listen directive requires a valid port number and optional host");
 	}
 }
 
-void ServerConfig::setHost(const std::string& value, int port_part) {
+void ServerConfig::setHost(const std::string& value, ListenDirective& directive) {
 	if (value.empty()) {
-		_listen[port_part] = "0.0.0.0";
+		directive.host = "0.0.0.0";
+	} else {
+		directive.host = value;
 	}
 	
 	std::istringstream iss(value);
@@ -95,7 +104,7 @@ void ServerConfig::setHost(const std::string& value, int port_part) {
 	}
 	if (count != 4 )
 		throw std::runtime_error("Syntax error: host directive requires a valid IP address");
-	_listen[port_part] = value;
+	directive.host = value;
 }
 
 void ServerConfig::setServerName(const std::vector<std::string>& value) {
@@ -123,17 +132,18 @@ void ServerConfig::setServerName(const std::vector<std::string>& value) {
 	_server_name = value;
 }
 
-
-//NOT GOOD BEHAVIOUR
-const std::map<int, std::string>& ServerConfig::getPortPair() const {
+const std::vector<ServerConfig::ListenDirective>& ServerConfig::getPortPair() const {
 	if (_listen.empty())
 		throw std::runtime_error("No listen directive defined for this server");
 	return _listen;
 }
 
 bool ServerConfig::listensOnPort(int port) const {
-	std::map<int, std::string>::const_iterator it = _listen.find(port);
-	return it != _listen.end();
+	for (size_t i = 0; i < _listen.size(); ++i) {
+		if (_listen[i].port == port)
+			return true;
+	}
+	return false;
 }
 
 const std::vector<std::string>& ServerConfig::getServerName() const {
@@ -175,9 +185,13 @@ void ServerConfig::addLocation(const LocationConfig& location) {
 // debug
 std::ostream& operator<<(std::ostream& os, const ServerConfig& config) {
 	os << "Port(s): ";
-	const std::map<int, std::string>& listen = config.getPortPair();
-	for (std::map<int, std::string>::const_iterator it = listen.begin(); it != listen.end(); ++it) {
-		os << it->first << " (" << it->second << ") ";
+	const std::vector<ServerConfig::ListenDirective>& listen = config.getPortPair();
+	for (size_t i = 0; i < listen.size(); i++) {
+		os << listen[i].host << ":" << listen[i].port;
+		if (listen[i].default_server)
+			os << " (default)";
+		if (i != listen.size() - 1)
+			os << ", ";
 	}
 	os << "\n";
 	for (size_t i = 0; i < config.getServerName().size(); i++) {
