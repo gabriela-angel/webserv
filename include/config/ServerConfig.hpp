@@ -33,6 +33,7 @@ public:
 	void setDirective(const std::string& key, const std::vector<std::string>& value);
 	void addLocation(const LocationConfig& location);
 	bool listensOnPort(int port) const;
+	bool isDefaultServer() const;
 private:
 	std::vector<ListenDirective> _listen;
 	std::vector<std::string>	_server_name;

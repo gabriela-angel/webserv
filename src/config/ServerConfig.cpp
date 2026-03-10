@@ -146,6 +146,14 @@ bool ServerConfig::listensOnPort(int port) const {
 	return false;
 }
 
+bool ServerConfig::isDefaultServer(void) const{
+	for (size_t i = 0; i < _listen.size(); ++i) {
+		if (_listen[i].default_server)
+			return true;
+	}
+	return false;
+}
+
 const std::vector<std::string>& ServerConfig::getServerName() const {
 	return _server_name;
 }

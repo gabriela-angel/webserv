@@ -23,7 +23,7 @@ ServerConfig& ManagerConfig::findServer(int port, const std::string& host_header
 			const std::vector<std::string>& server_names = _servers[i].getServerName();
 			if (std::find(server_names.begin(), server_names.end(), host_header) != server_names.end())
 				return _servers[i];
-			if (default_server == -1)
+			if (default_server == -1 || _servers[i].isDefaultServer())
 				default_server = i;
 		}
 	}
