@@ -53,17 +53,19 @@
 #include "RequestProcessor.hpp"
 
 HttpResponse RequestProcessor::process(const HttpRequest& request, const ManagerConfig& config) {
-	HttpResponse response;
+	HttpResponse response();
 	ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
 	LocationConfig* location = matchLocation(request.getUri(), server);
-	
+
 	if (!location) {
 		// No matching location, handle with server config (e.g., return 404 or default page)
+		response.setStatus(NOT_FOUND);
+		return response;
 	}
 	if (location->getHasRedirect()) {
 		response.setStatus(location->getRedirectCode());
 		// THIS MIGHT CHANGE, CHECK HOW REDIREECT USUALLY APPEARS IN REPONSE
-		response.setHeader("Location", location->getRedirectUrl());
+		response.addHeader("Location", location->getRedirectUrl());
 		return response;
 	}
 	if (!isMethodAllowed(request.getMethod(), *location)) {
@@ -72,6 +74,7 @@ HttpResponse RequestProcessor::process(const HttpRequest& request, const Manager
 		return response;
 	}
 	//resolver root
+	//send to method functions
 }
 
 LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
@@ -100,6 +103,7 @@ LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerC
 bool RequestProcessor::isMethodAllowed(const std::string& method, const LocationConfig& location) {
 	const std::vector<std::string>& allowed_methods = location.getMethods();
 	for (size_t i = 0; i < allowed_methods.size(); i++) {
+		//verificar se Luiz ja ta me enviando tudo em uppercase
 		if (allowed_methods[i] == method)
 			return true;
 	}
