@@ -39,7 +39,7 @@ std::string HttpResponse::toString() const {
 	ss << HTTP_VERSION << " " << _statusCode << " " << HttpStatus::reasonPhrase(_statusCode) << CRLF;
 
 	// check if capitalizing keys will be necessary
-	for (std::map<std::string, std::string>::iterator it = _headers.begin(); it != _headers.end(); ++it) {
+	for (std::map<std::string, std::string>::const_iterator it = _headers.begin(); it != _headers.end(); ++it) {
 		ss << it->first << ": " << it->second << CRLF;
 	}
 	ss << HEADER_END;

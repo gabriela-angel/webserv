@@ -56,7 +56,10 @@ void BaseConfig::setRoot(const std::vector<std::string>& value) {
 		throw std::runtime_error("Syntax error: root directive requires exactly one argument");
 	if (!isValidDirectory(value[0]))
 		throw std::runtime_error("Syntax error: root directive requires a valid directory");
-	_root = value[0];
+	if (value[0].length() > 1 && value[0][value[0].length() - 1] == '/')
+		_root = value[0].substr(0, value[0].length() - 1);
+	else
+		_root = value[0];
 	_has_root = true;
 }
 

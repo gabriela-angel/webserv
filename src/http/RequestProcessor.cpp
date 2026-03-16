@@ -37,44 +37,44 @@ HttpResponse RequestProcessor::process(const HttpRequest& request, const Manager
 	LocationConfig* location = matchLocation(request.getUri(), server);
 
 	if (!location) {
-		// No matching location, handle with server config (e.g., return 404 or default page)
 		response.setStatus(HttpStatus::NOT_FOUND);
-		// should I implement error pages in here??
+		// 	processError(?);
+		// No matching location, handle with server config (e.g., return 404 or default page)
 		return response;
 	}
 	if (location->hasRedirect()) {
-		response.setStatus(static_cast<HttpStatus::Code>(location->getRedirectCode()));
-		if (!(location->getRedirectUrl().empty()))
+		int code  = location->getRedirectCode();
+		if (code >= 300 && code < 400)
+		// processRedirect(?);
+			response.setStatus(static_cast<HttpStatus::Code>(code));
 			response.addHeader("Location", location->getRedirectUrl());
-		// should I implement error pages in here??
+		// else
+		// 	processError(?);
 		return response;
 	}
 	if (!isMethodAllowed(request.getMethod(), *location)) {
 		response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
-		// should I implement error pages in here??
+		//processError(?);
 		return response;
 	}
-	if (location->hasRoot()) {
-		std::string relative = request.getUri().substr(location->getPathPrefix().length());
-		if (relative.empty())
-			relative = "/";
-		//let's make sure root never ends with a slash to avoid double slashes
-		_filepath = location->getRoot() + relative;
+	
+	if (request.getMethod() == "GET") {
+		handleGet(request, response, server, location);
+	}
+	else if (request.getMethod() == "POST") {
+		handlePost(request, response, server, location);
 	}
 	else {
-		_filepath = server.getRoot() + request.getUri();
+		handleDelete(request, response, server, location);
 	}
-	processMethods(request, response, location, server);
 
 	return response;
 }
 
-void RequestProcessor::processMethods(const HttpRequest& request, HttpResponse& response, LocationConfig* location, ServerConfig& server) {
-	
-}
+void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+	std::string filepath = resolveFilePath(server, location, request->getUri());
 
-
-	if (isValidDirectory(_filepath)) {
+	if (isValidDirectory(filepath)) {
 		if (location->hasIndexFiles())
 			handleIndexFiles();
 		else if (location->getAutoindex())
@@ -84,10 +84,12 @@ void RequestProcessor::processMethods(const HttpRequest& request, HttpResponse& 
 			return response;
 		}
 	}
-	else if (!isValidFile(_filepath)) {
+	else if (!isValidFile(filepath)) {
 		response.setStatus(HttpStatus::NOT_FOUND);
 		return response;
 	}
+
+}
 
 LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
 	unsigned long match_length = 0;
@@ -120,4 +122,24 @@ bool RequestProcessor::isMethodAllowed(const std::string& method, const Location
 			return true;
 	}
 	return false;
+}
+
+
+std::string RequestProcessor::resolveFilePath(ServerConfig& server, LocationConfig* location, std::string uri) {
+	std::string filepath;
+
+	if (location->hasRoot()) {
+		std::string relative = uri.substr(location->getPathPrefix().length());
+		if (relative.empty())
+			relative = "/";
+		if (relative[0] != '/')
+			relative = "/" + relative;
+		filepath = location->getRoot() + relative;
+	}
+	else {
+		if (uri[0] != '/')
+			uri = "/" + uri;
+		filepath = server.getRoot() + uri;
+	}
+	return filepath;
 }
