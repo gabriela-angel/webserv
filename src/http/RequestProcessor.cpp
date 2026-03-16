@@ -3,21 +3,17 @@
 // Recebe HttpRequest - DONE
 // Descobre o ServerConfig correto (host + port) - DONE
 // Encontra a LocationConfig mais específica (match por prefixo) -DONE
-// Verifica se há redirect
+// Verifica se há redirect - DONE
 // Se sim → resposta 301/302 e para aqui
-// Verifica se o método é permitido
-// Se não → 405
-// Resolve root (location → server fallback)
-// Constrói path no filesystem
-// Continua fluxo (index, autoindex, etc.)
+// Verifica se o método é permitido - DONE
+// Se não → 405 - DONE
+// Resolve root (location → server fallback) - DONE
+// Constrói path no filesystem - DONE
 // Verificar se é diretório
 // Resolver index
 // Verificar existência
 // Executar GET/POST/DELETE
 // Criar o HttpResponse
-
-// to create file path -> root + best match location
-// if best match location ahs root, use it, otherwise use server root
 
 // Se o path final aponta para um diretório:
 // Exemplo:
@@ -33,49 +29,65 @@
 // 		Se autoindex on → gera listagem
 //		Senão → 403 ou 404 (dependendo da política)
 
-// Depois que você sabe qual location vale:
-// request.method ∈ allowed_methods ?
-// Se não:
-// → retornar 405
-
-// Redirecionamento (301 / 302)
-// Se a location tiver algo como:
-// return 301 /new-path;
-
-// Você:
-// Não tenta acessar filesystem
-
-// Gera Response com:
-// status 301 ou 302
-// header Location: novo_path
-// body opcional
-
 #include "RequestProcessor.hpp"
 
 HttpResponse RequestProcessor::process(const HttpRequest& request, const ManagerConfig& config) {
-	HttpResponse response();
+	HttpResponse response;
 	ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
 	LocationConfig* location = matchLocation(request.getUri(), server);
 
 	if (!location) {
 		// No matching location, handle with server config (e.g., return 404 or default page)
-		response.setStatus(NOT_FOUND);
+		response.setStatus(HttpStatus::NOT_FOUND);
+		// should I implement error pages in here??
 		return response;
 	}
-	if (location->getHasRedirect()) {
-		response.setStatus(location->getRedirectCode());
-		// THIS MIGHT CHANGE, CHECK HOW REDIREECT USUALLY APPEARS IN REPONSE
-		response.addHeader("Location", location->getRedirectUrl());
+	if (location->hasRedirect()) {
+		response.setStatus(static_cast<HttpStatus::Code>(location->getRedirectCode()));
+		if (!(location->getRedirectUrl().empty()))
+			response.addHeader("Location", location->getRedirectUrl());
+		// should I implement error pages in here??
 		return response;
 	}
 	if (!isMethodAllowed(request.getMethod(), *location)) {
-		response.setStatus(METHOD_NOT_ALLOWED);
-		// check if that's all we need to set for 405 response
+		response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
+		// should I implement error pages in here??
 		return response;
 	}
-	//resolver root
-	//send to method functions
+	if (location->hasRoot()) {
+		std::string relative = request.getUri().substr(location->getPathPrefix().length());
+		if (relative.empty())
+			relative = "/";
+		//let's make sure root never ends with a slash to avoid double slashes
+		_filepath = location->getRoot() + relative;
+	}
+	else {
+		_filepath = server.getRoot() + request.getUri();
+	}
+	processMethods(request, response, location, server);
+
+	return response;
 }
+
+void RequestProcessor::processMethods(const HttpRequest& request, HttpResponse& response, LocationConfig* location, ServerConfig& server) {
+	
+}
+
+
+	if (isValidDirectory(_filepath)) {
+		if (location->hasIndexFiles())
+			handleIndexFiles();
+		else if (location->getAutoindex())
+			handleAutoindex();
+		else {
+			response.setStatus(HttpStatus::FORBIDDEN);
+			return response;
+		}
+	}
+	else if (!isValidFile(_filepath)) {
+		response.setStatus(HttpStatus::NOT_FOUND);
+		return response;
+	}
 
 LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
 	unsigned long match_length = 0;

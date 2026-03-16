@@ -8,7 +8,7 @@
 
 class HttpResponse {
 private:
-	HttpStatus							_statusCode;
+	HttpStatus::Code							_statusCode;
 	std::map<std::string, std::string>	_headers;
 	std::string							_body;
 public:
@@ -18,7 +18,7 @@ public:
 	~HttpResponse();
 
 	// methods tbd, BUT PROBABLY:
-	void setStatus(HttpStatus status);
+	void setStatus(HttpStatus::Code status);
 	void addHeader(const std::string& key, const std::string& value);
 	void setBody(const std::string& body);
 	

@@ -164,20 +164,6 @@ void BaseConfig::setClientMaxBodySize(const std::vector<std::string>& value) {
 	}
 }
 
-std::string BaseConfig::toUpper(std::string str)
-{
-	for (size_t i = 0; i < str.length(); i++)
-		str[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(str[i])));
-	return str;
-}
-
-bool BaseConfig::isValidDirectory(const std::string& path) {
-	struct stat info;
-	if (stat(path.c_str(), &info) != 0 || !S_ISDIR(info.st_mode))
-		return false;
-	return true;
-}
-
 const std::string& BaseConfig::getRoot() const {
 	return _root;
 }
@@ -198,10 +184,6 @@ const std::map<int, std::string>& BaseConfig::getErrorPages() const {
 	return _error_pages;
 }
 
-const bool& BaseConfig::getHasRedirect() const {
-	return _has_redirect;
-}
-
 const int& BaseConfig::getRedirectCode() const {
 	return _redirect_code;
 }
@@ -212,4 +194,20 @@ const std::string& BaseConfig::getRedirectUrl() const {
 
 const size_t& BaseConfig::getClientMaxBodySize() const {
 	return _client_max_body_size;
+}
+
+const bool& BaseConfig::hasRoot() const {
+	return _has_root;
+}
+
+const bool& BaseConfig::hasAutoindex() const {
+	return _has_autoindex;
+}
+
+const bool& BaseConfig::hasIndexFiles() const {
+	return _has_index_files;
+}
+
+const bool& BaseConfig::hasRedirect() const {
+	return _has_redirect;
 }

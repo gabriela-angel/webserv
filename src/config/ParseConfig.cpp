@@ -70,6 +70,13 @@ std::vector<ServerConfig> ParseConfig::parse() {
 	if (servers.empty())
 		throw std::runtime_error("At least one server block must be defined in the configuration file");
 
+	for (size_t i = 0; i < servers.size(); i++) {
+		if (servers[i].getPortPair().empty())
+			throw std::runtime_error("Each server block must have at least one listen directive");
+		if (!servers[i].hasRoot())
+			throw std::runtime_error("Each server block must have a root directive");
+	}
+
 	return servers;
 }
 
@@ -153,20 +160,6 @@ void ParseConfig::cutComments(std::string& line) {
 	if (in_single || in_double) {
 		throw std::runtime_error("Invalid syntax: line " + itoa(_line_counter) + ": Unclosed quote");
 	}
-}
-
-std::string ParseConfig::trim(const std::string& str) {
-	size_t first = str.find_first_not_of(" \t\r\n");
-	if (first == std::string::npos)
-		return "";
-	size_t last = str.find_last_not_of(" \t\r\n");
-	return str.substr(first, last - first + 1);
-}
-
-std::string ParseConfig::itoa(int num) {
-	std::ostringstream oss;
-	oss << num;
-	return oss.str();
 }
 
 // Arquivo .conf

@@ -26,7 +26,6 @@ private:
 	void initSetters();
 	void setUpload(const std::vector<std::string>& value);
 	void setCgi(const std::vector<std::string>& value);
-
 public:
 	LocationConfig(const std::vector<std::string>& values);
 	LocationConfig(const LocationConfig& copy);

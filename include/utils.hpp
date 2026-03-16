@@ -19,7 +19,12 @@ bool isValidDirectory(const std::string& path) {
 	return true;
 }
 
-// ID VALID FILE FUNC
+bool isValidFile(const std::string& path) {
+	struct stat info;
+	if (stat(path.c_str(), &info) != 0 || !S_ISREG(info.st_mode))
+		return false;
+	return true;
+}
 
 std::string trim(const std::string& str) {
 	size_t first = str.find_first_not_of(" \t\r\n");

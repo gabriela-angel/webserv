@@ -17,6 +17,7 @@
 # define PARSECONFIG_HPP
 
 # include "./config/ServerConfig.hpp"
+# include "./utils.hpp"
 # include <fstream>
 # include <sstream>
 # include <stdexcept>
@@ -38,8 +39,6 @@ private:
 	ParseConfig& operator=(const ParseConfig& other);
 
 	void cutComments(std::string& line);
-	std::string trim(const std::string& str);
-	std::string itoa(int num);
 
 	bool setKeyValue(const std::string& line, std::string& key, std::vector<std::string>& value);
 	bool setContext(const std::string& key, const std::vector<std::string>& value, std::vector<ServerConfig>& servers);
