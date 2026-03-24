@@ -54,6 +54,7 @@ public:
 	const bool& 						hasAutoindex() const;
 	const bool& 						hasIndexFiles() const;
 	const bool& 						hasRedirect() const;
+	const bool& 						hasMaxBodySize() const;
 };
 
 #endif

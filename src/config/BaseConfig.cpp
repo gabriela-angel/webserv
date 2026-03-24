@@ -214,3 +214,7 @@ const bool& BaseConfig::hasIndexFiles() const {
 const bool& BaseConfig::hasRedirect() const {
 	return _has_redirect;
 }
+
+const bool& BaseConfig::hasMaxBodySize() const {
+	return _has_client_max_body_size;
+}

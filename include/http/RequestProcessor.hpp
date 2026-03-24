@@ -15,6 +15,8 @@ private:
 	void			handleGet(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
 	void			handlePost(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
 	void			handleDelete(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
+
+	
 public:
 	HttpResponse process(const HttpRequest& request, const ManagerConfig& config);
 

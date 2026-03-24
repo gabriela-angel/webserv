@@ -1,4 +1,3 @@
-
 // Quando request chega:
 // Recebe HttpRequest - DONE
 // Descobre o ServerConfig correto (host + port) - DONE
@@ -29,7 +28,7 @@
 // 		Se autoindex on → gera listagem
 //		Senão → 403 ou 404 (dependendo da política)
 
-#include "RequestProcessor.hpp"
+#include "./http/RequestProcessor.hpp"
 
 HttpResponse RequestProcessor::process(const HttpRequest& request, const ManagerConfig& config) {
 	HttpResponse response;
@@ -71,25 +70,83 @@ HttpResponse RequestProcessor::process(const HttpRequest& request, const Manager
 	return response;
 }
 
+// METHOD RELATED -----------------------------------------------------------------------------------
+
 void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
-	std::string filepath = resolveFilePath(server, location, request->getUri());
+	std::string filepath = resolveFilePath(server, location, request.getUri());
 
 	if (isValidDirectory(filepath)) {
-		if (location->hasIndexFiles())
-			handleIndexFiles();
-		else if (location->getAutoindex())
-			handleAutoindex();
-		else {
-			response.setStatus(HttpStatus::FORBIDDEN);
-			return response;
+		if (location->hasIndexFiles()) {
+			std::vector<std::string> index_files = location->getIndexFiles();
+			for (size_t i = 0; i < index_files.size(); i++) {
+				std::string index_path;
+				index_path = filepath + index_files[i];
+				//DEBUG
+				std::cout << index_path;
+				if (isValidFile(index_path)) {
+					//check if it's cgi
+					//if not
+					serveStatic(response,index_path);
+					return ;
+				}
+			}
 		}
+		if (location->getAutoindex()) {
+			generateAutoindex();
+			return ;
+		}
+		response.setStatus(HttpStatus::FORBIDDEN);
+		return ;
 	}
 	else if (!isValidFile(filepath)) {
 		response.setStatus(HttpStatus::NOT_FOUND);
-		return response;
+		return ;
+	}
+	//check if it's cgi
+	//if not
+	serveStatic(response, filepath);
+}
+
+void RequestProcessor::serveStatic(HttpResponse& response, const std::string& path) {
+	if (access(path.c_str(), R_OK) != 0) {
+		response.setStatus(HttpStatus::FORBIDDEN);
+		return ;
 	}
 
+	struct stat info;
+	if (stat(path.c_str(), &info) != 0 || info.st_size < 0) {
+		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+		return ;
+	}
+	size_t file_size = static_cast<size_t>(info.st_size);
+	size_t max_body_size;
+	if (location->hasMaxBodySize())
+		max_body_size = location->getClientMaxBodySize();
+	else
+		max_body_size = server->getClientMaxBodySize();
+	if (file_size > max_body_size) {
+		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
+		return ;
+	}
+	
+	std::ifstream file(path.c_str(), std::ios::binary);
+	std::vector<char> buffer(file_size);
+	file.read(buffer.data(), file_size);
+	if (!file){
+		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+		return ;
+	}
+
+	response.setBody(std::string(buffer.begin(), buffer.end()));
+	response.addHeader("Content-Type", FileUtils::guessMimeType(path));	
+	response.setStatus(HttpStatus::OK);
 }
+
+
+
+
+// -------------------------------------------------------------------------------------
+
 
 LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
 	unsigned long match_length = 0;

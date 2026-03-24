@@ -3,6 +3,7 @@
 
 # include <string>
 # include <sys/stat.h>
+# include <sstream>
 
 // CHECK IF WE CAN KEEP THIS OR WE SHOULD MAKE UTIL CLASSES/NAMESPACES
 
