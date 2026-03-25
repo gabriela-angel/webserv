@@ -76,29 +76,31 @@ void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& respo
 	std::string filepath = resolveFilePath(server, location, request.getUri());
 
 	if (isValidDirectory(filepath)) {
+		if (filepath[filepath.size() - 1] != '/')
+			filepath += '/';
 		if (location->hasIndexFiles()) {
 			std::vector<std::string> index_files = location->getIndexFiles();
 			for (size_t i = 0; i < index_files.size(); i++) {
-				std::string index_path;
-				index_path = filepath + index_files[i];
+				std::string index_path = filepath + index_files[i];
 				//DEBUG
 				std::cout << index_path;
 				if (isValidFile(index_path)) {
 					//check if it's cgi
 					//if not
-					serveStatic(response,index_path);
+					serveStatic(response, index_path, server, location);
 					return ;
 				}
 			}
 		}
-		if (location->getAutoindex()) {
-			generateAutoindex();
+		if (location->hasAutoindex() && location->getAutoindex()) {
+			generateAutoindex(response, filepath, request.getUri());
 			return ;
 		}
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return ;
 	}
-	else if (!isValidFile(filepath)) {
+	
+	if (!isValidFile(filepath)) {
 		response.setStatus(HttpStatus::NOT_FOUND);
 		return ;
 	}
@@ -106,6 +108,90 @@ void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& respo
 	//if not
 	serveStatic(response, filepath);
 }
+
+void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+	// TODO: check if it's CGI
+ 
+	size_t max_body_size = location->hasMaxbodySize()
+		? location->getClientMaxBodySize()
+		: server.getClientMaxBodySize();
+	if (request.getBody().size() > max_body_size) {
+		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
+		return;
+	}
+ 
+	// Dispatch multipart uploads before any filesystem resolution
+	const std::map<std::string, std::string>& headers = request.getHeaders();
+	std::map<std::string, std::string>::const_iterator ct_it = headers.find("Content-Type");
+	if (ct_it != headers.end() && ct_it->second.find("multipart/form-data") != std::string::npos) {
+		if (handleMultipart(request, response, location))
+			response.setStatus(HttpStatus::CREATED);
+		return;
+	}
+ 
+	std::string filepath = resolveFilePath(server, location, request.getUri());
+	bool file_existed = false;
+	std::string dest = resolvePostDest(request, response, location, filepath, file_existed);
+	if (dest.empty())
+		return;
+ 
+	if (!writeToFile(dest, request.getBody())) {
+		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+		return;
+	}
+ 
+	if (!file_existed) {
+		response.setStatus(HttpStatus::CREATED);
+		response.addHeader("Location", request.getUri());
+		response.setBody("File created successfully");
+	} else {
+		response.setStatus(HttpStatus::OK);
+		response.setBody("File updated successfully");
+	}
+	response.addHeader("Content-Type", "text/plain");
+}
+ 
+void RequestProcessor::handleDelete(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+	std::string filepath = resolveFilePath(server, location, request.getUri());
+ 
+	// Target must exist
+	if (!isValidFile(filepath) && !isValidDirectory(filepath)) {
+		response.setStatus(HttpStatus::NOT_FOUND);
+		return;
+	}
+ 
+	// TODO: check if it's CGI
+ 
+	// Permission check on parent (and dir itself if applicable)
+	if (!canDelete(filepath)) {
+		response.setStatus(HttpStatus::FORBIDDEN);
+		return;
+	}
+ 
+	if (isValidFile(filepath)) {
+		if (unlink(filepath.c_str()) == 0)
+			response.setStatus(HttpStatus::NO_CONTENT);
+		else
+			response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+		return;
+	}
+ 
+	if (isValidDirectory(filepath)) {
+		if (!isEmptyDirectory(filepath)) {
+			response.setStatus(HttpStatus::CONFLICT);
+			return;
+		}
+		if (rmdir(filepath.c_str()) == 0)
+			response.setStatus(HttpStatus::NO_CONTENT);
+		else
+			response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+		return;
+	}
+ 
+	response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+}
+//---------
+
 
 void RequestProcessor::serveStatic(HttpResponse& response, const std::string& path) {
 	if (access(path.c_str(), R_OK) != 0) {
@@ -130,27 +216,270 @@ void RequestProcessor::serveStatic(HttpResponse& response, const std::string& pa
 	}
 	
 	std::ifstream file(path.c_str(), std::ios::binary);
-	std::vector<char> buffer(file_size);
-	file.read(buffer.data(), file_size);
-	if (!file){
+	if (!file.is_open()) {
 		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
-		return ;
+		return;
 	}
 
-	response.setBody(std::string(buffer.begin(), buffer.end()));
-	response.addHeader("Content-Type", FileUtils::guessMimeType(path));	
+	std::string body(file_size, '\0');
+	file.read(&body[0], static_cast<std::streamsize>(file_size));
+	if (!file && !file.eof()) {
+		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+		return;
+	}
+
 	response.setStatus(HttpStatus::OK);
+	response.setBody(std::string(buffer.begin(), buffer.end()));
+	response.addHeader("Content-Type", guessMimeType(path));
+	response.addHeader("Content-Length", itoa(static_cast<int>(file_size)));
+}
+
+void RequestProcessor::generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri) {
+	DIR* dir = opendir(dirpath.c_str());
+	if (!dir) {
+		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+		return;
+	}
+ 
+	std::ostringstream html;
+	html << "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\">"
+	     << "<title>Index of " << uri << "</title></head>\n"
+	     << "<body>\n<h1>Index of " << uri << "</h1>\n<hr>\n<pre>\n";
+ 
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != NULL) {
+		std::string name = entry->d_name;
+		if (name == ".")
+			continue;
+ 
+		std::string fullpath = dirpath + name;
+		struct stat info;
+		std::string display = name;
+		std::string size_str = "-";
+ 
+		if (stat(fullpath.c_str(), &info) == 0) {
+			if (S_ISDIR(info.st_mode))
+				display += "/";
+			else
+				size_str = intToString(static_cast<int>(info.st_size));
+		}
+ 
+		std::string href = uri;
+		if (href[href.size() - 1] != '/')
+			href += '/';
+		href += name;
+		if (S_ISDIR(info.st_mode))
+			href += '/';
+ 
+		html << "<a href=\"" << href << "\">" << display << "</a>"
+		     << "\t\t" << size_str << "\n";
+	}
+	closedir(dir);
+ 
+	html << "</pre>\n<hr>\n</body>\n</html>\n";
+ 
+	std::string body = html.str();
+	response.setStatus(HttpStatus::OK);
+	response.setBody(body);
+	response.addHeader("Content-Type", "text/html");
+	response.addHeader("Content-Length", intToString(static_cast<int>(body.size())));
+}
+ 
+
+std::string RequestProcessor::extractHeaderAttribute(const std::string& header, const std::string& key) {
+	size_t pos = header.find(key + "=");
+	if (pos == std::string::npos)
+		return "";
+	pos += key.size() + 1;
+	if (pos < header.size() && header[pos] == '"') {
+		pos++;
+		size_t end = header.find('"', pos);
+		if (end != std::string::npos)
+			return header.substr(pos, end - pos);
+	} else {
+		size_t end = header.find_first_of(" ;\r\n", pos);
+		return header.substr(pos, end == std::string::npos ? end : end - pos);
+	}
+	return "";
+}
+ 
+std::string RequestProcessor::extractFilename(const std::string& disposition) {
+	std::string filename = extractHeaderAttribute(disposition, "filename");
+	if (!filename.empty())
+		return filename;
+	std::ostringstream ss;
+	ss << "upload_" << time(NULL);
+	return ss.str();
+}
+ 
+bool RequestProcessor::writeToFile(const std::string& dest, const std::string& body) {
+	std::ofstream out(dest.c_str(), std::ios::binary | std::ios::trunc);
+	if (!out.is_open())
+		return false;
+	out.write(body.c_str(), static_cast<std::streamsize>(body.size()));
+	return out.good();
+}
+ 
+std::string RequestProcessor::resolvePostDest(const HttpRequest& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed) {
+	if (isValidDirectory(filepath)) {
+		std::string upload_dir = location->getUpload();
+		if (upload_dir.empty() || !isValidDirectory(upload_dir) || access(upload_dir.c_str(), W_OK) != 0) {
+			response.setStatus(HttpStatus::FORBIDDEN);
+			return "";
+		}
+		if (upload_dir[upload_dir.size() - 1] != '/')
+			upload_dir += '/';
+		// Get Content-Disposition from request headers for the filename
+		const std::map<std::string, std::string>& hdrs = request.getHeaders();
+		std::map<std::string, std::string>::const_iterator cd_it = hdrs.find("Content-Disposition");
+		std::string disposition = (cd_it != hdrs.end()) ? cd_it->second : "";
+		std::string dest = upload_dir + extractFilename(disposition);
+		file_existed = isValidFile(dest);
+		return dest;
+	}
+ 
+	if (isValidFile(filepath)) {
+		if (access(filepath.c_str(), W_OK) != 0) {
+			response.setStatus(HttpStatus::FORBIDDEN);
+			return "";
+		}
+		file_existed = true;
+		return filepath;
+	}
+ 
+	// Path doesn't exist: create it if upload is configured and parent is writable
+	if (location->getUpload().empty()) {
+		response.setStatus(HttpStatus::FORBIDDEN);
+		return "";
+	}
+	size_t slash = filepath.rfind('/');
+	std::string parent = (slash != std::string::npos) ? filepath.substr(0, slash) : ".";
+	if (!isValidDirectory(parent)) {
+		response.setStatus(HttpStatus::NOT_FOUND);
+		return "";
+	}
+	if (access(parent.c_str(), W_OK) != 0) {
+		response.setStatus(HttpStatus::FORBIDDEN);
+		return "";
+	}
+	file_existed = false;
+	return filepath;
+}
+ 
+bool RequestProcessor::handleMultipart(const HttpRequest& request, HttpResponse& response, LocationConfig* location) {
+	const std::map<std::string, std::string>& headers = request.getHeaders();
+ 
+	// Validate upload directory
+	std::string upload_dir = location->getUpload();
+	if (upload_dir.empty() || !isValidDirectory(upload_dir) || access(upload_dir.c_str(), W_OK) != 0) {
+		response.setStatus(HttpStatus::FORBIDDEN);
+		return false;
+	}
+ 
+	// Extract boundary from Content-Type header
+	std::map<std::string, std::string>::const_iterator ct_it = headers.find("Content-Type");
+	if (ct_it == headers.end()) {
+		response.setStatus(HttpStatus::BAD_REQUEST);
+		return false;
+	}
+	std::string boundary = extractHeaderAttribute(ct_it->second, "boundary");
+	if (boundary.empty()) {
+		response.setStatus(HttpStatus::BAD_REQUEST);
+		return false;
+	}
+ 
+	std::string sep = "--" + boundary;
+	const std::string& body = request.getBody();
+ 
+	size_t pos = body.find(sep);
+	if (pos == std::string::npos) {
+		response.setStatus(HttpStatus::BAD_REQUEST);
+		return false;
+	}
+	pos += sep.size();
+ 
+	while (true) {
+		// "--" after separator means final boundary, we're done
+		if (pos + 2 <= body.size() && body.compare(pos, 2, "--") == 0)
+			break;
+ 
+		// Skip the CRLF after the boundary line
+		if (pos + 2 <= body.size() && body.compare(pos, 2, "\r\n") == 0)
+			pos += 2;
+ 
+		// Find end of part headers
+		size_t headers_end = body.find("\r\n\r\n", pos);
+		if (headers_end == std::string::npos) {
+			response.setStatus(HttpStatus::BAD_REQUEST);
+			return false;
+		}
+ 
+		std::string part_headers = body.substr(pos, headers_end - pos);
+		size_t file_start = headers_end + 4;
+ 
+		// Find the next boundary to know where this part's data ends
+		size_t next_boundary = body.find(sep, file_start);
+		if (next_boundary == std::string::npos) {
+			response.setStatus(HttpStatus::BAD_REQUEST);
+			return false;
+		}
+ 
+		// Extract filename from this part's Content-Disposition
+		size_t cd_pos = part_headers.find("Content-Disposition:");
+		if (cd_pos != std::string::npos) {
+			size_t cd_end = part_headers.find("\r\n", cd_pos);
+			std::string cd_value = part_headers.substr(cd_pos, cd_end == std::string::npos ? cd_end : cd_end - cd_pos);
+			std::string filename = extractFilename(cd_value);
+ 
+			if (!filename.empty()) {
+				// Strip CRLF before the next boundary
+				size_t file_end = next_boundary;
+				if (file_end >= 2 && body.compare(file_end - 2, 2, "\r\n") == 0)
+					file_end -= 2;
+ 
+				if (upload_dir[upload_dir.size() - 1] != '/')
+					upload_dir += '/';
+				std::string out_path = upload_dir + filename;
+				size_t data_size = (file_end > file_start) ? file_end - file_start : 0;
+ 
+				if (!writeToFile(out_path, body.substr(file_start, data_size))) {
+					response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+					return false;
+				}
+			}
+		}
+		pos = next_boundary + sep.size();
+	}
+ 
+	response.setBody("Files uploaded successfully");
+	response.addHeader("Content-Type", "text/plain");
+	return true;
+}
+
+bool RequestProcessor::canDelete(const std::string& path) {
+	size_t pos = path.find_last_of('/');
+	std::string parent;
+	if (pos == std::string::npos)
+		parent = ".";
+	else if (pos == 0)
+		parent = "/";
+	else
+		parent = path.substr(0, pos);
+ 
+	if (access(parent.c_str(), W_OK | X_OK) != 0)
+		return false;
+	if (isValidDirectory(path) && access(path.c_str(), W_OK | X_OK) != 0)
+		return false;
+	return true;
 }
 
 
-
-
-// -------------------------------------------------------------------------------------
+// ------ Routing helpers -------------------------------------------------------------------
 
 
 LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
 	unsigned long match_length = 0;
-	LocationConfig* best_match = nullptr;
+	LocationConfig* best_match = NULL;
 
 	if (request_uri.length() > 1 && request_uri[request_uri.length() - 1] == '/')
 		request_uri.erase(request_uri.length() - 1);

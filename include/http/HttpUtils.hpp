@@ -1,51 +1,52 @@
 #define HTTP_VERSION "HTTP/1.1"
 #define CRLF "\r\n"
 #define HEADER_END CRLF CRLF
-
+ 
 struct HttpStatus
 {
-    enum Code
-    {
-        // =========================
-        // 2xx Success
-        // =========================
-        OK = 200,
-        CREATED = 201,
-        NO_CONTENT = 204,
-
-        // =========================
-        // 3xx Redirection
-        // =========================
-        MOVED_PERMANENTLY = 301,
-        FOUND = 302,
-        TEMPORARY_REDIRECT = 307,
-        PERMANENT_REDIRECT = 308,
-
-        // =========================
-        // 4xx Client Errors
-        // =========================
-        BAD_REQUEST = 400,
-        FORBIDDEN = 403,
-        NOT_FOUND = 404,
-        METHOD_NOT_ALLOWED = 405,
-        REQUEST_TIMEOUT = 408,
-        LENGTH_REQUIRED = 411,
-        CONTENT_TOO_LARGE = 413,
-        URI_TOO_LONG = 414,
-        UNSUPPORTED_MEDIA_TYPE = 415,
+	enum Code
+	{
+		// =========================
+		// 2xx Success
+		// =========================
+		OK = 200,
+		CREATED = 201,
+		NO_CONTENT = 204,
+ 
+		// =========================
+		// 3xx Redirection
+		// =========================
+		MOVED_PERMANENTLY = 301,
+		FOUND = 302,
+		TEMPORARY_REDIRECT = 307,
+		PERMANENT_REDIRECT = 308,
+ 
+		// =========================
+		// 4xx Client Errors
+		// =========================
+		BAD_REQUEST = 400,
+		FORBIDDEN = 403,
+		NOT_FOUND = 404,
+		METHOD_NOT_ALLOWED = 405,
+		CONFLICT = 409,
+		REQUEST_TIMEOUT = 408,
+		LENGTH_REQUIRED = 411,
+		CONTENT_TOO_LARGE = 413,
+		URI_TOO_LONG = 414,
+		UNSUPPORTED_MEDIA_TYPE = 415,
 		RANGE_NOT_SATISFIABLE = 416,
-
-        // =========================
-        // 5xx Server Errors
-        // =========================
-        INTERNAL_SERVER_ERROR = 500,
-        NOT_IMPLEMENTED = 501,
-        BAD_GATEWAY = 502,
-        SERVICE_UNAVAILABLE = 503,
-        GATEWAY_TIMEOUT = 504,
-        HTTP_VERSION_NOT_SUPPORTED = 505
-    };
-
+ 
+		// =========================
+		// 5xx Server Errors
+		// =========================
+		INTERNAL_SERVER_ERROR = 500,
+		NOT_IMPLEMENTED = 501,
+		BAD_GATEWAY = 502,
+		SERVICE_UNAVAILABLE = 503,
+		GATEWAY_TIMEOUT = 504,
+		HTTP_VERSION_NOT_SUPPORTED = 505
+	};
+ 
 	inline static const char* reasonPhrase(HttpStatus::Code status)
 	{
 		switch(status)
@@ -54,18 +55,19 @@ struct HttpStatus
 			case HttpStatus::OK: return "OK";
 			case HttpStatus::CREATED: return "Created";
 			case HttpStatus::NO_CONTENT: return "No Content";
-
+ 
 			// 3xx
 			case HttpStatus::MOVED_PERMANENTLY: return "Moved Permanently";
 			case HttpStatus::FOUND: return "Found";
 			case HttpStatus::TEMPORARY_REDIRECT: return "Temporary Redirect";
 			case HttpStatus::PERMANENT_REDIRECT: return "Permanent Redirect";
-
+ 
 			// 4xx
 			case HttpStatus::BAD_REQUEST: return "Bad Request";
 			case HttpStatus::FORBIDDEN: return "Forbidden";
 			case HttpStatus::NOT_FOUND: return "Not Found";
 			case HttpStatus::METHOD_NOT_ALLOWED: return "Method Not Allowed";
+			case HttpStatus::CONFLICT: return "Conflict";
 			case HttpStatus::REQUEST_TIMEOUT: return "Request Timeout";
 			case HttpStatus::LENGTH_REQUIRED: return "Length Required";
 			case HttpStatus::CONTENT_TOO_LARGE: return "Content Too Large";
@@ -79,7 +81,7 @@ struct HttpStatus
 			case HttpStatus::SERVICE_UNAVAILABLE: return "Service Unavailable";
 			case HttpStatus::GATEWAY_TIMEOUT: return "Gateway Timeout";
 			case HttpStatus::HTTP_VERSION_NOT_SUPPORTED: return "HTTP Version Not Supported";
-
+ 
 			default: return "Unknown Status";
 		}
 	}
