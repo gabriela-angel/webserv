@@ -1,6 +1,6 @@
 #include "./http/HttpResponse.hpp"
 
-HttpResponse::HttpResponse() {}
+HttpResponse::HttpResponse() : _statusCode(HttpStatus::OK) {}
 
 HttpResponse::HttpResponse(const HttpResponse& copy) {
 	*this = copy;
@@ -22,10 +22,6 @@ void HttpResponse::setStatus(HttpStatus::Code status) {
 }
 
 void HttpResponse::addHeader(const std::string& key, const std::string& value) {
-	std::map<std::string, std::string>::iterator it = _headers.find(key);
-	if (it != _headers.end())
-		return ;
-	// check if osmething other than a simple return would be better, like a boolean
 	_headers[key] = value;
 }
 

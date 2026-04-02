@@ -5,6 +5,13 @@
 # include "./http/HttpResponse.hpp"
 # include "./config/ManagerConfig.hpp"
 # include "./utils.hpp"
+# include "./http/CgiHandler.hpp"
+# include <fstream>
+# include <sstream>
+# include <sys/stat.h>
+# include <dirent.h>
+# include <unistd.h>
+# include <cstring>
 
 class RequestProcessor {
 private:
@@ -16,12 +23,17 @@ private:
 	void			handlePost(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
 	void			handleDelete(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
 
-	void serveStatic(HttpResponse& response, const std::string& path);
-	
-
+	std::string		extractHeaderAttribute(const std::string& header, const std::string& key);
+	std::string		extractFilename(const std::string& disposition);
+	bool			writeToFile(const std::string& dest, const std::string& body);
+	std::string 	resolvePostDest(const HttpRequest& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed);
+	bool			handleMultipart(const HttpRequest& request, HttpResponse& response, LocationConfig* location);
+	bool			canDelete(const std::string& path);
+	void			serveFile(HttpResponse& response, const std::string& path, ServerConfig& server, LocationConfig* location);
+	void			generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri);
 	
 public:
-	HttpResponse process(const HttpRequest& request, const ManagerConfig& config);
+	HttpResponse	process(const HttpRequest& request, ManagerConfig& config);
 
 };
 

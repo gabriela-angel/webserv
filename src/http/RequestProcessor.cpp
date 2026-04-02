@@ -17,10 +17,8 @@
 // Se o path final aponta para um diretório:
 // Exemplo:
 // GET /images/
-
 // E o filesystem path é:
 // /var/www/images/
-
 // Você precisa verificar:
 // Existe um index configurado?
 // Se algum existir → serve esse.
@@ -30,47 +28,44 @@
 
 #include "./http/RequestProcessor.hpp"
 
-HttpResponse RequestProcessor::process(const HttpRequest& request, const ManagerConfig& config) {
+HttpResponse RequestProcessor::process(const HttpRequest& request, ManagerConfig& config) {
 	HttpResponse response;
 	ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
 	LocationConfig* location = matchLocation(request.getUri(), server);
 
 	if (!location) {
 		response.setStatus(HttpStatus::NOT_FOUND);
-		// 	processError(?);
-		// No matching location, handle with server config (e.g., return 404 or default page)
 		return response;
 	}
 	if (location->hasRedirect()) {
-		int code  = location->getRedirectCode();
-		if (code >= 300 && code < 400)
-		// processRedirect(?);
-			response.setStatus(static_cast<HttpStatus::Code>(code));
+		int code = location->getRedirectCode();
+		response.setStatus(static_cast<HttpStatus::Code>(code));
+		if (code >= 300 && code < 400) {
 			response.addHeader("Location", location->getRedirectUrl());
-		// else
-		// 	processError(?);
+		} else if (!location->getRedirectUrl().empty()) {
+			// 2xx/4xx/5xx: second argument is a response body
+			response.setBody(location->getRedirectUrl());
+			response.addHeader("Content-Type", "text/plain");
+			response.addHeader("Content-Length", itoa(static_cast<int>(location->getRedirectUrl().size())));
+		}
 		return response;
 	}
 	if (!isMethodAllowed(request.getMethod(), *location)) {
 		response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
-		//processError(?);
 		return response;
 	}
 	
-	if (request.getMethod() == "GET") {
+	if (request.getMethod() == "GET")
 		handleGet(request, response, server, location);
-	}
-	else if (request.getMethod() == "POST") {
+	else if (request.getMethod() == "POST")
 		handlePost(request, response, server, location);
-	}
-	else {
+	else
 		handleDelete(request, response, server, location);
-	}
 
 	return response;
 }
 
-// METHOD RELATED -----------------------------------------------------------------------------------
+// METHOD RELATED ---------------------------------------------------------------------------------
 
 void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
@@ -78,16 +73,20 @@ void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& respo
 	if (isValidDirectory(filepath)) {
 		if (filepath[filepath.size() - 1] != '/')
 			filepath += '/';
-		if (location->hasIndexFiles()) {
-			std::vector<std::string> index_files = location->getIndexFiles();
-			for (size_t i = 0; i < index_files.size(); i++) {
-				std::string index_path = filepath + index_files[i];
-				//DEBUG
-				std::cout << index_path;
+
+		const std::vector<std::string>* index_files = NULL;
+		if (location->hasIndexFiles())
+			index_files = &location->getIndexFiles();
+		else if (server.hasIndexFiles())
+			index_files = &server.getIndexFiles();
+
+		if (index_files) {
+			for (size_t i = 0; i < index_files->size(); i++) {
+				std::string index_path = filepath + (*index_files)[i];
 				if (isValidFile(index_path)) {
-					//check if it's cgi
-					//if not
-					serveStatic(response, index_path, server, location);
+					if (CgiHandler::tryRun(request, response, *location, index_path))
+						return;
+					serveFile(response, index_path, server, location);
 					return ;
 				}
 			}
@@ -104,15 +103,15 @@ void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& respo
 		response.setStatus(HttpStatus::NOT_FOUND);
 		return ;
 	}
-	//check if it's cgi
-	//if not
-	serveStatic(response, filepath);
+
+	if (CgiHandler::tryRun(request, response, *location, filepath))
+		return;
+	serveFile(response, filepath, server, location);
 }
 
+
 void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
-	// TODO: check if it's CGI
- 
-	size_t max_body_size = location->hasMaxbodySize()
+	size_t max_body_size = location->hasMaxBodySize()
 		? location->getClientMaxBodySize()
 		: server.getClientMaxBodySize();
 	if (request.getBody().size() > max_body_size) {
@@ -120,7 +119,6 @@ void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& resp
 		return;
 	}
  
-	// Dispatch multipart uploads before any filesystem resolution
 	const std::map<std::string, std::string>& headers = request.getHeaders();
 	std::map<std::string, std::string>::const_iterator ct_it = headers.find("Content-Type");
 	if (ct_it != headers.end() && ct_it->second.find("multipart/form-data") != std::string::npos) {
@@ -130,6 +128,9 @@ void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& resp
 	}
  
 	std::string filepath = resolveFilePath(server, location, request.getUri());
+ 
+	if (isValidFile(filepath) && CgiHandler::tryRun(request, response, *location, filepath))
+		return;
 	bool file_existed = false;
 	std::string dest = resolvePostDest(request, response, location, filepath, file_existed);
 	if (dest.empty())
@@ -154,15 +155,14 @@ void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& resp
 void RequestProcessor::handleDelete(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
  
-	// Target must exist
 	if (!isValidFile(filepath) && !isValidDirectory(filepath)) {
 		response.setStatus(HttpStatus::NOT_FOUND);
 		return;
 	}
  
-	// TODO: check if it's CGI
+	if (isValidFile(filepath) && CgiHandler::tryRun(request, response, *location, filepath))
+		return;
  
-	// Permission check on parent (and dir itself if applicable)
 	if (!canDelete(filepath)) {
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return;
@@ -189,11 +189,12 @@ void RequestProcessor::handleDelete(const HttpRequest& request, HttpResponse& re
 	}
  
 	response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
+	(void)server;
 }
-//---------
 
 
-void RequestProcessor::serveStatic(HttpResponse& response, const std::string& path) {
+// File serving ---------------------------------------------------------------------------------
+void RequestProcessor::serveFile(HttpResponse& response, const std::string& path, ServerConfig& server, LocationConfig* location) {
 	if (access(path.c_str(), R_OK) != 0) {
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return ;
@@ -209,7 +210,7 @@ void RequestProcessor::serveStatic(HttpResponse& response, const std::string& pa
 	if (location->hasMaxBodySize())
 		max_body_size = location->getClientMaxBodySize();
 	else
-		max_body_size = server->getClientMaxBodySize();
+		max_body_size = server.getClientMaxBodySize();
 	if (file_size > max_body_size) {
 		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
 		return ;
@@ -229,11 +230,13 @@ void RequestProcessor::serveStatic(HttpResponse& response, const std::string& pa
 	}
 
 	response.setStatus(HttpStatus::OK);
-	response.setBody(std::string(buffer.begin(), buffer.end()));
+	response.setBody(body);
 	response.addHeader("Content-Type", guessMimeType(path));
 	response.addHeader("Content-Length", itoa(static_cast<int>(file_size)));
 }
 
+
+// Autoindex ---------------------------------------------------------------------------------
 void RequestProcessor::generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri) {
 	DIR* dir = opendir(dirpath.c_str());
 	if (!dir) {
@@ -261,7 +264,7 @@ void RequestProcessor::generateAutoindex(HttpResponse& response, const std::stri
 			if (S_ISDIR(info.st_mode))
 				display += "/";
 			else
-				size_str = intToString(static_cast<int>(info.st_size));
+				size_str = itoa(static_cast<int>(info.st_size));
 		}
  
 		std::string href = uri;
@@ -282,10 +285,12 @@ void RequestProcessor::generateAutoindex(HttpResponse& response, const std::stri
 	response.setStatus(HttpStatus::OK);
 	response.setBody(body);
 	response.addHeader("Content-Type", "text/html");
-	response.addHeader("Content-Length", intToString(static_cast<int>(body.size())));
+	response.addHeader("Content-Length", itoa(static_cast<int>(body.size())));
 }
- 
 
+// Method utils ---------------------------------------------------------------------------------
+ 
+// Extracts an attribute value from a header field, e.g. "boundary" from Content-Type or "filename" from Content-Disposition
 std::string RequestProcessor::extractHeaderAttribute(const std::string& header, const std::string& key) {
 	size_t pos = header.find(key + "=");
 	if (pos == std::string::npos)
@@ -302,7 +307,8 @@ std::string RequestProcessor::extractHeaderAttribute(const std::string& header, 
 	}
 	return "";
 }
- 
+
+// Returns the filename from Content-Disposition header, or a timestamp-based fallback
 std::string RequestProcessor::extractFilename(const std::string& disposition) {
 	std::string filename = extractHeaderAttribute(disposition, "filename");
 	if (!filename.empty())
@@ -311,7 +317,8 @@ std::string RequestProcessor::extractFilename(const std::string& disposition) {
 	ss << "upload_" << time(NULL);
 	return ss.str();
 }
- 
+
+// Writes body to path, returns false on failure
 bool RequestProcessor::writeToFile(const std::string& dest, const std::string& body) {
 	std::ofstream out(dest.c_str(), std::ios::binary | std::ios::trunc);
 	if (!out.is_open())
@@ -319,7 +326,9 @@ bool RequestProcessor::writeToFile(const std::string& dest, const std::string& b
 	out.write(body.c_str(), static_cast<std::streamsize>(body.size()));
 	return out.good();
 }
- 
+
+// Resolves the destination path for a POST and sets file_existed.
+// Returns an empty string and sets the response status on error.
 std::string RequestProcessor::resolvePostDest(const HttpRequest& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed) {
 	if (isValidDirectory(filepath)) {
 		std::string upload_dir = location->getUpload();
@@ -329,7 +338,6 @@ std::string RequestProcessor::resolvePostDest(const HttpRequest& request, HttpRe
 		}
 		if (upload_dir[upload_dir.size() - 1] != '/')
 			upload_dir += '/';
-		// Get Content-Disposition from request headers for the filename
 		const std::map<std::string, std::string>& hdrs = request.getHeaders();
 		std::map<std::string, std::string>::const_iterator cd_it = hdrs.find("Content-Disposition");
 		std::string disposition = (cd_it != hdrs.end()) ? cd_it->second : "";
@@ -366,17 +374,17 @@ std::string RequestProcessor::resolvePostDest(const HttpRequest& request, HttpRe
 	return filepath;
 }
  
+
+// Handles multipart/form-data uploads: parses each part and saves files to upload_dir
 bool RequestProcessor::handleMultipart(const HttpRequest& request, HttpResponse& response, LocationConfig* location) {
 	const std::map<std::string, std::string>& headers = request.getHeaders();
  
-	// Validate upload directory
 	std::string upload_dir = location->getUpload();
 	if (upload_dir.empty() || !isValidDirectory(upload_dir) || access(upload_dir.c_str(), W_OK) != 0) {
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return false;
 	}
  
-	// Extract boundary from Content-Type header
 	std::map<std::string, std::string>::const_iterator ct_it = headers.find("Content-Type");
 	if (ct_it == headers.end()) {
 		response.setStatus(HttpStatus::BAD_REQUEST);
@@ -399,15 +407,12 @@ bool RequestProcessor::handleMultipart(const HttpRequest& request, HttpResponse&
 	pos += sep.size();
  
 	while (true) {
-		// "--" after separator means final boundary, we're done
 		if (pos + 2 <= body.size() && body.compare(pos, 2, "--") == 0)
 			break;
  
-		// Skip the CRLF after the boundary line
-		if (pos + 2 <= body.size() && body.compare(pos, 2, "\r\n") == 0)
+		if (pos + 2 <= body.size() && body.compare(pos, 2, CRLF) == 0)
 			pos += 2;
  
-		// Find end of part headers
 		size_t headers_end = body.find("\r\n\r\n", pos);
 		if (headers_end == std::string::npos) {
 			response.setStatus(HttpStatus::BAD_REQUEST);
@@ -417,24 +422,21 @@ bool RequestProcessor::handleMultipart(const HttpRequest& request, HttpResponse&
 		std::string part_headers = body.substr(pos, headers_end - pos);
 		size_t file_start = headers_end + 4;
  
-		// Find the next boundary to know where this part's data ends
 		size_t next_boundary = body.find(sep, file_start);
 		if (next_boundary == std::string::npos) {
 			response.setStatus(HttpStatus::BAD_REQUEST);
 			return false;
 		}
  
-		// Extract filename from this part's Content-Disposition
 		size_t cd_pos = part_headers.find("Content-Disposition:");
 		if (cd_pos != std::string::npos) {
-			size_t cd_end = part_headers.find("\r\n", cd_pos);
+			size_t cd_end = part_headers.find(CRLF, cd_pos);
 			std::string cd_value = part_headers.substr(cd_pos, cd_end == std::string::npos ? cd_end : cd_end - cd_pos);
 			std::string filename = extractFilename(cd_value);
  
 			if (!filename.empty()) {
-				// Strip CRLF before the next boundary
 				size_t file_end = next_boundary;
-				if (file_end >= 2 && body.compare(file_end - 2, 2, "\r\n") == 0)
+				if (file_end >= 2 && body.compare(file_end - 2, 2, CRLF) == 0)
 					file_end -= 2;
  
 				if (upload_dir[upload_dir.size() - 1] != '/')
@@ -456,6 +458,8 @@ bool RequestProcessor::handleMultipart(const HttpRequest& request, HttpResponse&
 	return true;
 }
 
+// Checks that the parent directory (and the target itself if a directory)
+// grant write+execute permission, which is required to remove an entry
 bool RequestProcessor::canDelete(const std::string& path) {
 	size_t pos = path.find_last_of('/');
 	std::string parent;
@@ -473,24 +477,28 @@ bool RequestProcessor::canDelete(const std::string& path) {
 	return true;
 }
 
-
-// ------ Routing helpers -------------------------------------------------------------------
+// Routing helpers ---------------------------------------------------------------------------------
 
 
 LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
 	unsigned long match_length = 0;
 	LocationConfig* best_match = NULL;
 
+	// Strip query string before prefix matching
+	size_t q = request_uri.find('?');
+	if (q != std::string::npos)
+		request_uri = request_uri.substr(0, q);
+
 	if (request_uri.length() > 1 && request_uri[request_uri.length() - 1] == '/')
 		request_uri.erase(request_uri.length() - 1);
+
 	for (size_t i = 0; i < server.getLocations().size(); i++) {
 		const std::string& prefix = server.getLocations()[i].getPathPrefix();
 		if (prefix.length() > request_uri.length())
 			continue;
 		if (request_uri.compare(0, prefix.length(), prefix) == 0) {
-			if (request_uri.length() > prefix.length() && request_uri[prefix.length()] != '/') {
+			if (request_uri.length() > prefix.length() && request_uri[prefix.length()] != '/')
 				continue;
-			}
 			if (prefix.length() > match_length) {
 				match_length = prefix.length();
 				best_match = &server.getLocations()[i];
@@ -513,6 +521,11 @@ bool RequestProcessor::isMethodAllowed(const std::string& method, const Location
 
 std::string RequestProcessor::resolveFilePath(ServerConfig& server, LocationConfig* location, std::string uri) {
 	std::string filepath;
+
+	// Strip query string — it's for CGI env, not the filesystem path
+	size_t q = uri.find('?');
+	if (q != std::string::npos)
+		uri = uri.substr(0, q);
 
 	if (location->hasRoot()) {
 		std::string relative = uri.substr(location->getPathPrefix().length());

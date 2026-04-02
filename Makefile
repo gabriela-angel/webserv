@@ -31,6 +31,7 @@ LOGS_PATH = ./logs/
 
 UTILS_PATH = ./utils/
 CONFIG_PATH = ./config/
+HTTP_PATH = ./http/
 FILES = \
 	main.cpp \
 	$(UTILS_PATH)Logger.cpp \
@@ -39,6 +40,10 @@ FILES = \
 	$(CONFIG_PATH)ServerConfig.cpp \
 	$(CONFIG_PATH)LocationConfig.cpp \
 	$(CONFIG_PATH)BaseConfig.cpp \
+	$(HTTP_PATH)HttpRequest.cpp \
+	$(HTTP_PATH)HttpResponse.cpp \
+	$(HTTP_PATH)RequestProcessor.cpp \
+	$(HTTP_PATH)CgiHandler.cpp \
 
 OBJS = $(addprefix $(BUILD_PATH), $(FILES:%.cpp=%.o))
 

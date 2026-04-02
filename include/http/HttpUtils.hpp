@@ -1,6 +1,11 @@
-#define HTTP_VERSION "HTTP/1.1"
-#define CRLF "\r\n"
-#define HEADER_END CRLF CRLF
+#ifndef HTTPUTILS_HPP
+# define HTTPUTILS_HPP
+ 
+ 
+# include <cstddef>
+# define HTTP_VERSION "HTTP/1.1"
+# define CRLF "\r\n"
+# define HEADER_END CRLF CRLF
  
 struct HttpStatus
 {
@@ -18,6 +23,7 @@ struct HttpStatus
 		// =========================
 		MOVED_PERMANENTLY = 301,
 		FOUND = 302,
+		SEE_OTHER = 303,
 		TEMPORARY_REDIRECT = 307,
 		PERMANENT_REDIRECT = 308,
  
@@ -28,8 +34,8 @@ struct HttpStatus
 		FORBIDDEN = 403,
 		NOT_FOUND = 404,
 		METHOD_NOT_ALLOWED = 405,
-		CONFLICT = 409,
 		REQUEST_TIMEOUT = 408,
+		CONFLICT = 409,
 		LENGTH_REQUIRED = 411,
 		CONTENT_TOO_LARGE = 413,
 		URI_TOO_LONG = 414,
@@ -59,6 +65,7 @@ struct HttpStatus
 			// 3xx
 			case HttpStatus::MOVED_PERMANENTLY: return "Moved Permanently";
 			case HttpStatus::FOUND: return "Found";
+			case HttpStatus::SEE_OTHER: return "See Other";
 			case HttpStatus::TEMPORARY_REDIRECT: return "Temporary Redirect";
 			case HttpStatus::PERMANENT_REDIRECT: return "Permanent Redirect";
  
@@ -86,11 +93,11 @@ struct HttpStatus
 		}
 	}
 };
-
-
+ 
+ 
 struct Content {
 	enum Type {
-
+ 
 		// Text types
 		TEXT_PLAIN,
 		TEXT_HTML,
@@ -98,7 +105,7 @@ struct Content {
 		TEXT_JAVASCRIPT,
 		TEXT_CSV,
 		TEXT_XML,
-
+ 
 		// Application types
 		APPLICATION_JSON,
 		APPLICATION_XML,
@@ -110,12 +117,12 @@ struct Content {
 		APLICATION_JAVASCRIPT,
 		APLICATION_SQL,
 		APLICATION_WASM,
-
+ 
 		// Multipart types
 		MULTIPART_FORM_DATA,
 		MULTIPART_MIXED,
 		MULTPART_BYTERANGES,
-
+ 
 		// Image types
 		IMAGE_PNG,
 		IMAGE_JPEG,
@@ -124,35 +131,37 @@ struct Content {
 		IMAGE_SVG_XML,
 		IMAGE_BMP,
 		IMAGE_ICON,
-
+ 
 		// Audio types
 		AUDIO_MPEG,
 		AUDIO_WAV,
 		AUDIO_OGG,
 		AUDIO_WEBM,
-
+ 
 		// Video types
 		VIDEO_MP4,
 		VIDEO_WEBM,
 		VIDEO_OGG,
 		VIDEO_MSVIDEO,
-
+ 
 		// Font types
 		FONT_WOFF,
 		FONT_WOFF2,
 		FONT_TTF,
 		FONT_OTF,
-
+ 
 	};
-
+ 
 };
-
+ 
 template <typename T>
 struct HttpPart
 {
 	T value;
 	size_t size;
-
+ 
 	HttpPart() : value(), size(0) {}
-
+ 
 };
+ 
+#endif
