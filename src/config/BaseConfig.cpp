@@ -20,7 +20,9 @@ BaseConfig::BaseConfig(const BaseConfig& copy) {
 	_has_root = copy._has_root;
 	_root = copy._root;
 	_methods = copy._methods;
+	_has_autoindex = copy._has_autoindex;
 	_autoindex = copy._autoindex;
+	_has_index_files = copy._has_index_files;
 	_index_files = copy._index_files;
 	_error_pages = copy._error_pages;
 	_has_redirect = copy._has_redirect;
@@ -35,7 +37,9 @@ BaseConfig& BaseConfig::operator=(const BaseConfig& other) {
 		_has_root = other._has_root;
 		_root = other._root;
 		_methods = other._methods;
+		_has_autoindex = other._has_autoindex;
 		_autoindex = other._autoindex;
+		_has_index_files = other._has_index_files;
 		_index_files = other._index_files;
 		_error_pages = other._error_pages;
 		_has_redirect = other._has_redirect;
@@ -56,7 +60,10 @@ void BaseConfig::setRoot(const std::vector<std::string>& value) {
 		throw std::runtime_error("Syntax error: root directive requires exactly one argument");
 	if (!isValidDirectory(value[0]))
 		throw std::runtime_error("Syntax error: root directive requires a valid directory");
-	_root = value[0];
+	if (value[0].length() > 1 && value[0][value[0].length() - 1] == '/')
+		_root = value[0].substr(0, value[0].length() - 1);
+	else
+		_root = value[0];
 	_has_root = true;
 }
 
@@ -164,20 +171,6 @@ void BaseConfig::setClientMaxBodySize(const std::vector<std::string>& value) {
 	}
 }
 
-std::string BaseConfig::toUpper(std::string str)
-{
-	for (size_t i = 0; i < str.length(); i++)
-		str[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(str[i])));
-	return str;
-}
-
-bool BaseConfig::isValidDirectory(const std::string& path) {
-	struct stat info;
-	if (stat(path.c_str(), &info) != 0 || !S_ISDIR(info.st_mode))
-		return false;
-	return true;
-}
-
 const std::string& BaseConfig::getRoot() const {
 	return _root;
 }
@@ -198,10 +191,6 @@ const std::map<int, std::string>& BaseConfig::getErrorPages() const {
 	return _error_pages;
 }
 
-const bool& BaseConfig::getHasRedirect() const {
-	return _has_redirect;
-}
-
 const int& BaseConfig::getRedirectCode() const {
 	return _redirect_code;
 }
@@ -212,4 +201,24 @@ const std::string& BaseConfig::getRedirectUrl() const {
 
 const size_t& BaseConfig::getClientMaxBodySize() const {
 	return _client_max_body_size;
+}
+
+const bool& BaseConfig::hasRoot() const {
+	return _has_root;
+}
+
+const bool& BaseConfig::hasAutoindex() const {
+	return _has_autoindex;
+}
+
+const bool& BaseConfig::hasIndexFiles() const {
+	return _has_index_files;
+}
+
+const bool& BaseConfig::hasRedirect() const {
+	return _has_redirect;
+}
+
+const bool& BaseConfig::hasMaxBodySize() const {
+	return _has_client_max_body_size;
 }

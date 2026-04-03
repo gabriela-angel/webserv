@@ -50,6 +50,7 @@ FILES = \
 	$(SERVER_PATH)EventLoop.cpp
 =======
 CONFIG_PATH = ./config/
+HTTP_PATH = ./http/
 FILES = \
 	main.cpp \
 	$(UTILS_PATH)Logger.cpp \
@@ -58,7 +59,14 @@ FILES = \
 	$(CONFIG_PATH)ServerConfig.cpp \
 	$(CONFIG_PATH)LocationConfig.cpp \
 	$(CONFIG_PATH)BaseConfig.cpp \
+<<<<<<< HEAD
 >>>>>>> master
+=======
+	$(HTTP_PATH)HttpRequest.cpp \
+	$(HTTP_PATH)HttpResponse.cpp \
+	$(HTTP_PATH)RequestProcessor.cpp \
+	$(HTTP_PATH)CgiHandler.cpp \
+>>>>>>> location-route
 
 OBJS = $(addprefix $(BUILD_PATH), $(FILES:%.cpp=%.o))
 

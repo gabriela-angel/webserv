@@ -64,8 +64,7 @@ void LocationConfig::setCgi(const std::vector<std::string>& value) {
 		throw std::runtime_error("Syntax error: cgi directive requires exactly two arguments");
 	if (value[0].length() < 2 || value[0][0] != '.')
 		throw std::runtime_error("Syntax error: cgi directive requires a file extension as the first argument");
-	struct stat info;
-	if (stat(value[1].c_str(), &info) != 0 || !S_ISREG(info.st_mode) || access(value[1].c_str(), X_OK) != 0)
+	if (!isValidFile(value[1]) || access(value[1].c_str(), X_OK) != 0)
 		throw std::runtime_error("Syntax error: cgi directive requires a valid executable path as the second argument");
 	if (_cgi.find(value[0]) != _cgi.end())
 		throw std::runtime_error("Syntax error: cgi directive has duplicate file extension");
@@ -89,7 +88,7 @@ const std::string& LocationConfig::getPathPrefix() const {
 // debug
 std::ostream& operator<<(std::ostream& os, const LocationConfig& config) {
 	os << "  Path Prefix: " << config.getPathPrefix() << "\n";
-	if (config.getHasRedirect()) {
+	if (config.hasRedirect()) {
 		os << "  Redirect: " << config.getRedirectCode() << " " << config.getRedirectUrl() << "\n";
 	}
 	os << "  Root: " << config.getRoot() << "\n";
