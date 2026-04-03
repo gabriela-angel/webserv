@@ -1,0 +1,90 @@
+body.bg {
+    background: url('space.jpeg') no-repeat;
+    background-size: cover;
+    color: white;
+    font-family: 'Science Gothic', Impact, Arial, sans-serif;
+}
+
+button, input {
+    padding: 10px 30px;
+    margin: 10px;
+    font-size: 30px;
+    background: transparent;
+    color: white;
+    border: 3px solid white;
+    outline: none;
+}
+
+button, input[type=file] {
+    cursor: pointer;
+}
+
+button:hover {
+    background: white;
+    color: black;
+    border: 3px solid black;
+}
+
+.delete-btn {
+    border: 3px solid red;
+    color: red;
+}
+
+.delete-btn:hover {
+    background-color: red;
+}
+
+
+.container {
+    height: 95vh;
+    width: 95vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.columns {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.title {
+    font-size: 80px;
+    margin: 0;
+    line-height: 1;
+}
+
+.subtitle {
+    font-size: 40px;
+    margin: 20px 0;
+    line-height: 1;
+    color: rgb(197, 197, 18);
+}
+
+.card {
+    background: transparent;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    border: 3px solid white;
+    overflow: hidden;
+    transition: transform 0.2s;
+    width: 400px;
+    height: 600px;
+}
+.card:hover {
+    transform: translateY(-5px);
+}
+.card img {
+    width: 100%;
+    height: 400px;
+    object-fit: cover;
+}
+.card-content {
+    padding: 15px;
+    text-align: center;
+}

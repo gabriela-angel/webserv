@@ -1,0 +1,141 @@
+html {
+    font-family: 'Reggae One', cursive;
+}
+
+header {
+    text-align: center;
+    padding-top: 20px;
+}
+
+body.bg {
+    background: url('ninjas.png') no-repeat;
+    background-size: cover;
+    color: white;
+}
+
+body.bg-silent {
+    background: url('ninja_silent.jpg') no-repeat;
+    background-size: cover;
+    color: white;
+}
+
+body.bg-deadly {
+    background: url('ninja_deadly.jpg') no-repeat;
+    background-size: cover;
+    color: white;
+}
+
+nav a {
+    margin: 0 15px;
+    color: #ffcc33;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.center-box {
+    margin-top: 0;
+    text-align: center;
+    background: rgba(0,0,0,0.6);
+    padding: 10px;
+    width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 12px;
+}
+
+.container {
+    height: 95vh;
+    width: 95vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.title-container{
+    height: 140vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.menu-container {
+    height: 130vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: end;
+    flex-direction: row;
+}
+
+.bottom-container {
+    height: 10vh;
+}
+
+.center-container {
+    height: 95vh;
+    width: 95vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    text-align: center;
+}
+
+.mb-0 {
+    margin-bottom: 0;
+}
+
+.title {
+    font-size: 280px;
+    margin-top: 0;
+    margin-bottom: 80px;
+    line-height: 1;
+}
+
+.subtitle {
+    font-size: 60px;
+    color: rgb(77, 77, 150);
+    line-height: 1;
+    margin-bottom: 50px;
+}
+
+.menu-item {
+    font-size: 50px;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    line-height: 10;
+}
+
+#fast:hover {
+    color: rgb(170, 193, 245);
+    transition-duration:0.1s;
+}
+
+#silent:hover {
+    color: rgb(46, 46, 46);
+    transition-duration:0.5s;
+}
+
+#deadly:hover {
+    color: red;
+    transition-duration:2s;
+}
+
+.mb-400 {
+    margin-bottom: 400px;
+}
+
+.mb-200 {
+    margin-bottom: 200px;
+}
+
+button {
+    padding: 15px;
+    border-radius: 10px;
+    font-size: xx-large;
+    background: #ffffff44;
+    color: white;
+    border: none;
+}
