@@ -1,11 +1,7 @@
-VALIDAR CONTENT-TYPE E HTTP_ (CgiHandler.cpp:103)
-
 ENVIAR PAGINA PADRAO 404 AO NAO ACHAR SERVIDOR CORRESPONDENTE
-
-NORMALIZAR 127.0.0.1 e localhost
 
 BUG AO REMOVER UM PONTO E VIRGULA DE ALGUMA LINHA DO CONFIG
 
-hostname tem que incluir porta
-
 verificar corretamente request.exception na resposta
+
+default_server nao parece estar funcionando
