@@ -1,15 +1,16 @@
 #ifndef HTTPRESPONSE_HPP
 # define HTTPRESPONSE_HPP
 
-# include "./http/HttpUtils.hpp"
+# include "HttpUtils.hpp"
+# include "Headers.hpp"
 # include <string>
 # include <map>
 # include <sstream>
 
 class HttpResponse {
 private:
-	HttpStatus::Code							_statusCode;
-	std::map<std::string, std::string>	_headers;
+	HttpStatus::Code					_statusCode;
+	Headers								_headers;
 	std::string							_body;
 public:
 	HttpResponse();

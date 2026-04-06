@@ -193,6 +193,17 @@ void ServerManager::handleWrite(int clientSocket)
 		request.body = httpData.body;
 	request.exception = client.exception;
 
+	HttpResponse response = RequestProcessor::process(request, _configs);
+	std::string responseStr = response.toString();
+	_logger.logDebug("Response to client " + to_string(client.clientSocket) + ":\n" + responseStr);
+	ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), 0);
+	if (bytesSent < 0)	{
+		_logger.logError("Error sending response to client socket");
+		_logger.logDebug("error code: " + to_string(errno));
+		_logger.logDebug("error message: " + std::string(strerror(errno)));
+		removeClient(clientSocket);
+		return;
+	}
 	// HttpResponse parseResponse(responseData)
 	// Add Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
 	

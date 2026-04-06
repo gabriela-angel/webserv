@@ -22,7 +22,7 @@ void HttpResponse::setStatus(HttpStatus::Code status) {
 }
 
 void HttpResponse::addHeader(const std::string& key, const std::string& value) {
-	_headers[key] = value;
+	_headers.add(key, value);
 }
 
 void HttpResponse::setBody(const std::string& body) {
@@ -35,9 +35,7 @@ std::string HttpResponse::toString() const {
 	ss << HTTP_VERSION << " " << _statusCode << " " << HttpStatus::reasonPhrase(_statusCode) << CRLF;
 
 	// check if capitalizing keys will be necessary
-	for (std::map<std::string, std::string>::const_iterator it = _headers.begin(); it != _headers.end(); ++it) {
-		ss << it->first << ": " << it->second << CRLF;
-	}
+	ss << _headers.toString();
 	ss << HEADER_END;
 	if (_body != "")
 		ss << _body;
