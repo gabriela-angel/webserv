@@ -184,10 +184,19 @@ void ServerManager::handleWrite(int clientSocket)
 	request.method = httpData.requestLine.method;
 	request.HTTPVersion = httpData.requestLine.version;
 	request.uri = httpData.requestLine.uri;
-	request.host = httpData.host;
 	request.headers = httpData.headers;
+	
+	// Host and Port
+	request.host = httpData.host;
+	request.port = 80; // Default HTTP port
 
-	request.port = ntohs(client.client_addr.sin_port);
+	size_t colon_pos = httpData.host.find(':');
+	if (colon_pos != std::string::npos)
+	{
+		request.host = httpData.host.substr(0, colon_pos);
+		request.port = from_string<int>(httpData.host.substr(colon_pos + 1));
+	}
+
 
 	if (request.method == "POST" || request.method == "PUT")
 		request.body = httpData.body;
@@ -204,6 +213,7 @@ void ServerManager::handleWrite(int clientSocket)
 		removeClient(clientSocket);
 		return;
 	}
+	_epoll.modifyClient(clientSocket, EPOLLIN);
 	// HttpResponse parseResponse(responseData)
 	// Add Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
 	

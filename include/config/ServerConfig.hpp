@@ -1,8 +1,9 @@
 #ifndef SERVERCONFIG_HPP
 # define SERVERCONFIG_HPP
 
-# include "./config/BaseConfig.hpp"
-# include "./config/LocationConfig.hpp"
+# include "BaseConfig.hpp"
+# include "LocationConfig.hpp"
+# include <netdb.h>
 # include <cstdlib>
 # include <map>
 # include <string>
@@ -16,6 +17,10 @@ public:
 		std::string host;
 		int port;
 		bool default_server;
+
+		ListenDirective() : host("0.0.0.0"), port(80), default_server(false) {}
+		ListenDirective(const std::string& host, int port) : host(host), port(port), default_server(false) {}
+		ListenDirective(const std::string& host, int port, bool default_server) : host(host), port(port), default_server(default_server) {}
 	};
 
 	ServerConfig();
@@ -44,11 +49,13 @@ private:
 
 	void initSetters();
 
+	ListenDirective handleAddress(const char *host, const char *port, bool default_server);
 	void setListen(const std::vector<std::string>& value);
-	void setHost(const std::string& value, ListenDirective& directive);
 	void setServerName(const std::vector<std::string>& value);
 };
 
 std::ostream& operator<<(std::ostream& os, const ServerConfig& config);
+
+# include "utils.tpp"
 
 #endif

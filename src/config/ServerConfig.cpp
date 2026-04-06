@@ -1,5 +1,6 @@
-#include "./config/ServerConfig.hpp"
+#include "ServerConfig.hpp"
 #include "Logger.hpp"
+#include "Socket.hpp"
 
 ServerConfig::ServerConfig() : BaseConfig() {
 	_listen.clear();
@@ -43,68 +44,86 @@ void ServerConfig::initSetters() {
 	_setters["client_max_body_size"] = &ServerConfig::setClientMaxBodySize;
 }
 
-void ServerConfig::setListen(const std::vector<std::string>& value) {
-	if (value.size() != 1 && value.size() != 2)
-		throw std::runtime_error("Syntax error: listen directive requires exactly one argument");
-
-	try {
-		std::string port_part = value[0];
-		std::string host_part = "";
-		if (value[0].find(':') != std::string::npos) {
-			size_t colon_pos = value[0].find(':');
-			port_part = value[0].substr(colon_pos + 1);
-			host_part = value[0].substr(0, colon_pos);
-		}
-		char *end;
-		errno = 0;
-		long port = std::strtol(port_part.c_str(), &end, 10);
-
-		if (errno != 0 || *end != '\0' || port < 1 || port > 65535)
-			throw std::runtime_error("");
-
-		ListenDirective directive = {"", static_cast<int>(port), false};
-		if (value.size() == 2) {
-			if (value[1] != "default_server")
-				throw std::runtime_error("Syntax error: invalid argument '" + value[1] + "' for listen directive");
-			directive.default_server = true;
-		}
-		setHost(host_part, directive);
-		_listen.push_back(directive);
-	} catch (...) {
-		throw std::runtime_error("Syntax error: listen directive requires a valid port number and optional host");
-	}
+inline static bool isPort(const std::string& str) {
+	char *end;
+	errno = 0;
+	long num = strtol(str.c_str(), &end, 10);
+	return errno == 0 && *end == '\0' && num >= 1 && num <= 65535;
 }
 
-void ServerConfig::setHost(const std::string& value, ListenDirective& directive) {
-	if (value.empty()) {
-		directive.host = "0.0.0.0";
-	} else {
-		directive.host = value;
+inline static bool onlyNumeric(const std::string& str) {
+	for (size_t i = 0; i < str.length(); i++) {
+		if (!std::isdigit(static_cast<unsigned char>(str[i])))
+			return false;
+	}
+	return true;
+}
+
+void ServerConfig::setListen(const std::vector<std::string>& value) {
+	if (value.size() > 2)
+		throw std::runtime_error("Syntax error: listen directive requires at most two arguments");
+	if (value[0].empty())
+		throw std::runtime_error("Syntax error: listen directive requires a non-empty argument");
+	if (value.size() == 2 && value[1] != "default_server")
+		throw std::runtime_error("Syntax error: invalid argument '" + value[1] + "' for listen directive");
+
+	
+	std::string arg1 = value[0];
+
+	
+	if (isPort(arg1)) {
+		ListenDirective directive = handleAddress("0.0.0.0", arg1.c_str(), value.size() == 2);
+		_listen.push_back(directive);
+		return ;
+	}
+
+
+	size_t colon_pos = arg1.find(':');
+	if (colon_pos != std::string::npos)
+	{
+		std::string host_part = arg1.substr(0, colon_pos);
+		std::string port_part = arg1.substr(colon_pos + 1);
+
+		if (!isPort(port_part))
+			throw std::runtime_error("Syntax error: invalid port number '" + port_part + "' in listen directive " + arg1);
+
+		if (onlyNumeric(host_part))
+			throw std::runtime_error("Syntax error: invalid host '" + host_part + "' in listen directive " + arg1);
+
+		ListenDirective directive = handleAddress(host_part.c_str(), port_part.c_str(), value.size() == 2);
+		_listen.push_back(directive);
+		return ;
 	}
 	
-	std::istringstream iss(value);
-	std::string octect;
-	int count = 0;
 
-	while (std::getline(iss, octect, '.')) {
-		try {
-			if (octect.empty())
-				throw std::runtime_error("");
+	// If we reach here, it means the argument is a host without a port
+	if (onlyNumeric(arg1))
+			throw std::runtime_error("Syntax error: invalid host '" + arg1 + "' in listen directive.");
+	ListenDirective directive = handleAddress(arg1.c_str(), "80", value.size() == 2);
+	_listen.push_back(directive);
+}
 
-			char *end;
-			errno = 0;
-			long num = strtol(octect.c_str(), &end, 10);
+ServerConfig::ListenDirective ServerConfig::handleAddress(const char *host, const char *port, bool default_server) {
+	struct addrinfo hints;
+    struct addrinfo *res;
 
-			if (errno != 0 || *end != '\0' || num < 0 || num > 255)
-				throw std::runtime_error("");
-			count++;
-		} catch (...) {
-			throw std::runtime_error("Syntax error: host directive requires a valid IP address");
-		}
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET; 			// IPv4
+	hints.ai_socktype = SOCK_STREAM;	// TCP
+	hints.ai_flags = AI_PASSIVE;		// If host is empty, use INADDR_ANY
+
+	int status = getaddrinfo(host, port, &hints, &res);
+
+	if (status != 0) {
+		freeaddrinfo(res);
+		throw std::runtime_error("Invalid host address '" + std::string(host) + ":" + std::string(port) + "': " + std::string(gai_strerror(status)));
 	}
-	if (count != 4 )
-		throw std::runtime_error("Syntax error: host directive requires a valid IP address");
-	directive.host = value;
+
+	struct sockaddr_in* ipv4 = (struct sockaddr_in*)res->ai_addr;
+	std::string ip_str = Socket::inetNtop(ipv4->sin_addr.s_addr);
+
+	freeaddrinfo(res);
+	return ListenDirective(ip_str, from_string<int>(port), default_server);
 }
 
 void ServerConfig::setServerName(const std::vector<std::string>& value) {

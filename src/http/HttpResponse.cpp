@@ -36,7 +36,7 @@ std::string HttpResponse::toString() const {
 
 	// check if capitalizing keys will be necessary
 	ss << _headers.toString();
-	ss << HEADER_END;
+	ss << CRLF;
 	if (_body != "")
 		ss << _body;
 
