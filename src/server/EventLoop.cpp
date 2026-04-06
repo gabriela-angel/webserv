@@ -1,15 +1,12 @@
 #include "EventLoop.hpp"
 
 EventLoop::~EventLoop() {}
-EventLoop::EventLoop(const char *configFilePath) : _logger(Logger::getInstance()), _serverManager()
-{
-	(void)configFilePath;
-}
+EventLoop::EventLoop(const char *configFilePath) : _logger(Logger::getInstance()), _serverManager(configFilePath) {}
 
 std::sig_atomic_t	_stopFlag = 0;
 void handle_sigint(int)
 {
-	Logger::getInstance().logInfo("SIGINT received, shutting down gracefully...");
+	Logger::getInstance().logDebug("SIGINT received, shutting down gracefully...");
 	_stopFlag = 1;
 }
 
