@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 
 #include "HttpException.hpp"
+#include "Headers.hpp"
 
 #define HTTP_VERSION "HTTP/1.1"
 #define CRLF "\r\n"
@@ -15,26 +16,11 @@
 
 #define HTTP_METHODS {"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"}
 
-// Main Headers
-#define HOST "HOST"
-#define CONTENT_LENGTH "CONTENT-LENGTH"
-#define TRANSFER_ENCODING "TRANSFER-ENCODING"
-#define CONNECTION "CONNECTION"
-#define EXPECT "EXPECT"
-#define CONTENT_TYPE "CONTENT-TYPE"
-#define COOKIE "COOKIE"
-
 class	Http {
 	public:
 		virtual ~Http() {}
 		typedef std::map<std::string, std::string>	Cookies;
-		typedef std::string							HeaderKey;
-		typedef std::vector<std::string>			HeaderValues;
-		typedef std::map<HeaderKey, HeaderValues>	HeaderMap;
-		typedef HeaderMap::const_iterator			ConstHeaderIterator;
-		typedef HeaderMap::iterator					HeaderIterator;
-		typedef HeaderValues::const_iterator		ConstHeaderValueIterator;
-		typedef HeaderValues::iterator				HeaderValueIterator;
+
 };
 
 struct	RequestLine {
@@ -47,7 +33,7 @@ struct	RequestLine {
 
 struct	HttpData {	
 	RequestLine		requestLine;
-	Http::HeaderMap	headers;
+	Headers			headers;
 	std::string		body;
 
 	// Main Info

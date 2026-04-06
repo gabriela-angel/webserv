@@ -1,18 +1,12 @@
-#include "./http/CgiHandler.hpp"
-#include "./http/HttpUtils.hpp"
-#include <cstdlib>
-#include <cstring>
-#include <sstream>
-#include <vector>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <errno.h>
+#include "CgiHandler.hpp"
+#include "HttpUtils.hpp"
+#include "RequestProcessor.hpp"
+
 
 // ─── Public entry point ───────────────────────────────────────────────────────
 
 bool CgiHandler::tryRun(
-	const HttpRequest&    request,
+	const HttpStruct&    request,
 	HttpResponse&         response,
 	const LocationConfig& location,
 	const std::string&    filepath
@@ -68,7 +62,7 @@ static std::string intStr(int n) {
 }
 
 char** CgiHandler::buildEnv(
-	const HttpRequest&  request,
+	const HttpStruct&  request,
 	const std::string&  filepath,
 	const std::string&  interpreter
 ) {
@@ -103,11 +97,13 @@ char** CgiHandler::buildEnv(
 	}
 
 	// Promote relevant HTTP headers to CGI env vars
-	const std::map<std::string, std::string>& headers = request.getHeaders();
-	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
+	const Headers& headers = request.getHeaders();
+
+
+	for (Headers::ConstIterator it = headers.begin(); it != headers.end(); ++it) {
 		// Content-Type is a special case: no HTTP_ prefix
 		if (it->first == "Content-Type") {
-			env_vec.push_back("CONTENT_TYPE=" + it->second);
+			env_vec.push_back("CONTENT_TYPE=" + it->second[0]);
 			continue;
 		}
 		// All other headers: uppercase, hyphens to underscores, HTTP_ prefix
@@ -116,7 +112,7 @@ char** CgiHandler::buildEnv(
 			char c = it->first[i];
 			key += (c == '-') ? '_' : static_cast<char>(toupper(c));
 		}
-		env_vec.push_back(key + "=" + it->second);
+		env_vec.push_back(key + "=" + it->second[0]);
 	}
 
 	env_vec.push_back("_INTERPRETER=" + interpreter); // informational

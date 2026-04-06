@@ -48,6 +48,7 @@ FILES = \
 	$(HTTP_PATH)HttpRequest.cpp \
 	$(HTTP_PATH)HttpException.cpp \
 	$(HTTP_PATH)HttpResponse.cpp \
+	$(HTTP_PATH)Headers.cpp \
 	$(SERVER_PATH)Socket.cpp \
 	$(SERVER_PATH)EpollManager.cpp \
 	$(SERVER_PATH)ServerManager.cpp \
@@ -57,8 +58,8 @@ FILES = \
 	$(CONFIG_PATH)ServerConfig.cpp \
 	$(CONFIG_PATH)LocationConfig.cpp \
 	$(CONFIG_PATH)BaseConfig.cpp \
-# 	$(HTTP_PATH)CgiHandler.cpp \
-# 	$(HTTP_PATH)RequestProcessor.cpp \
+	$(HTTP_PATH)CgiHandler.cpp \
+	$(HTTP_PATH)RequestProcessor.cpp \
 
 
 

@@ -1,5 +1,6 @@
 #include "ServerManager.hpp"
 #include "HttpRequest.hpp"
+#include "RequestProcessor.hpp"
 
 std::vector<Socket::Config> mapSocketConfig(const std::vector<ServerConfig> &servers)
 {
@@ -178,16 +179,19 @@ void ServerManager::handleWrite(int clientSocket)
 	ClientData &client = _clientMap[clientSocket];
 	HttpData &httpData = client.stateMachine.httpData;
 	
- 	HttpStruct responseData;
+ 	HttpStruct request;
 
-	responseData.method = httpData.requestLine.method;
-	responseData.HTTPVersion = httpData.requestLine.version;
-	responseData.uri = httpData.requestLine.uri;
-	responseData.host = httpData.host;
-	responseData.headers = httpData.headers;
-	if (responseData.method == "POST" || responseData.method == "PUT")
-		responseData.body = httpData.body;
-	responseData.exception = client.exception;
+	request.method = httpData.requestLine.method;
+	request.HTTPVersion = httpData.requestLine.version;
+	request.uri = httpData.requestLine.uri;
+	request.host = httpData.host;
+	request.headers = httpData.headers;
+
+	request.port = ntohs(client.client_addr.sin_port);
+
+	if (request.method == "POST" || request.method == "PUT")
+		request.body = httpData.body;
+	request.exception = client.exception;
 
 	// HttpResponse parseResponse(responseData)
 	// Add Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
