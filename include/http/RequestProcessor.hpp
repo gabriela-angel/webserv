@@ -39,6 +39,7 @@ struct HttpStruct {
 
 class RequestProcessor {
 private:
+	static void			handlePageErrors(HttpResponse& response, ServerConfig& server, LocationConfig* location);
 	static LocationConfig* matchLocation(std::string request_uri, ServerConfig& server);
 	static bool			isMethodAllowed(const std::string& method, const LocationConfig& location);
 	static std::string		resolveFilePath(ServerConfig& server, LocationConfig* location, std::string uri);

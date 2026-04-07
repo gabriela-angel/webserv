@@ -4,10 +4,17 @@ BUG AO REMOVER UM PONTO E VIRGULA DE ALGUMA LINHA DO CONFIG
 
 verificar corretamente request.exception na resposta
 
-default_server nao parece estar funcionando
+default_server nao parece estar funcionando (junto com o match das locations)
 
 VERIFICAR LEAKS
 
 IMPLEMENTAR LOGIN
 
 MAIOR PARTE DOS ERROS TEM Q TER Connection: close E FECHAR O SOCKET
+
+error_page nao ta funcionando
+    Varificar se "error_page 200 /errors/403.html;" funciona (precisa funcionar)
+
+(RequestProcessor.cpp:86) pensar em colocar 404 Not Found
+
+CGI so executa se for GET?
