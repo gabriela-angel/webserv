@@ -159,8 +159,9 @@ struct HttpPart
 {
 	T value;
 	size_t size;
+	bool isComplete;
  
-	HttpPart() : value(), size(0) {}
+	HttpPart() : value(), size(0), isComplete(false) {}
  
 };
  

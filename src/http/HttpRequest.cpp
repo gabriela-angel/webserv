@@ -50,7 +50,10 @@ void HttpRequest::processClient(ClientData &client) {
 
     while (sm.state != StateMachine::DONE && sm.state != StateMachine::ERROR) {
         if (_processClientState(client))
+		{
+			_logger.logDebug("Client " + to_string(client.clientSocket) + " - Waiting for more data...");
 			break; // if need more data
+		}
     }
 	_logger.logDebug("Client " + to_string(client.clientSocket) + " State: " + sm.getStateString());
 	
@@ -70,7 +73,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 				HttpPart<RequestLine> part = _parseRequestLine(buffer);
 
 				// If size is 0, it means we don't have a complete request line yet, so we wait for more data
-				if (part.size == 0) return true;
+				if (!part.isComplete) return true;
 
 				stateMachine.httpData.requestLine = part.value;
 				stateMachine.state = StateMachine::READING_HEADERS;
@@ -87,7 +90,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 				HttpPart<Headers> part = _parseHeaders(buffer);
 
 				// If size is 0, it means we don't have complete headers yet, so we wait for more data
-				if (part.size == 0) return true;
+				if (!part.isComplete) return true;
 				_validateRequestLine(stateMachine.httpData.requestLine);
 				_validateHeaders(part.value);
 				stateMachine.httpData.headers = part.value;
@@ -110,7 +113,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 					it will update client activity time to prevent timeout while waiting for the complete body.
 				*/
 				HttpPart<std::string> part = _parseBody(stateMachine);
-				if (part.size == 0) return true; // We don't have the complete body yet, wait for more data
+				if (!part.isComplete) return true; // We don't have the complete body yet, wait for more data
 
 				stateMachine.httpData.body = part.value;
 				stateMachine.state = StateMachine::DONE;
@@ -178,6 +181,7 @@ HttpPart<RequestLine> HttpRequest::_parseRequestLine(const std::string &buffer)
 	
 	part.value = requestLine;
 	part.size = pos + 2; // Include the size of CRLF
+	part.isComplete = true;
 	return part;
 }
 
@@ -293,6 +297,7 @@ HttpPart<Headers> HttpRequest::_parseHeaders(const std::string &buffer)
 	HttpPart<Headers> part;
 	part.value = headers;
 	part.size = end + 4; // Include the size of the delimiter
+	part.isComplete = true;
 	return part;
 }
 
@@ -460,7 +465,8 @@ HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 	const std::string	&buffer = stateMachine.buffer;
 	HttpData			&httpData = stateMachine.httpData;
 
-/* CONTENT-LENGTH */ //
+/* CONTENT-LENGTH */
+	_logger.logDebug("Client Content-Length: " + to_string(httpData.contentLength) + ", Buffer Size: " + to_string(buffer.size()));
 	if (httpData.contentLength > 0) {
 		if (buffer.size() < httpData.contentLength)
 			return HttpPart<std::string>(); // Wait for more data (Have CLI_TIMEOUT time to receive the body, otherwise close the connection)
@@ -468,6 +474,7 @@ HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 		HttpPart<std::string> part;
 		part.value = buffer.substr(0, httpData.contentLength);
 		part.size = httpData.contentLength;
+		part.isComplete = true;
 		return part;
 	}
 
@@ -480,5 +487,7 @@ HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 		// update client Activity
 	}
 
-	return HttpPart<std::string>(); // No body expected (connection will close in CLI_TIMEOUT seconds)
+	HttpPart<std::string> part;
+	part.isComplete = true;
+	return part;
 }

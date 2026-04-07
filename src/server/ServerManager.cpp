@@ -145,7 +145,7 @@ void ServerManager::handleRead(int clientSocket)
 {
 	ClientData &client = _clientMap[clientSocket];
 	char buffer[CLI_BUFFER_SIZE];
-	ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
+	ssize_t bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
 	if (bytesRead < 0)
 	{
 		_logger.logError("Error reading from client socket");
@@ -161,8 +161,7 @@ void ServerManager::handleRead(int clientSocket)
 		return;
 	}
 	
-	buffer[bytesRead] = '\0';
-	client.stateMachine.buffer += std::string(buffer);
+	client.stateMachine.buffer.append(buffer, bytesRead);
 	_logger.logDebug("Client " + to_string(client.clientSocket) + " read buffer: \n" + client.stateMachine.buffer);
 	
 	HttpRequest::processClient(client);
@@ -208,6 +207,10 @@ void ServerManager::handleWrite(int clientSocket)
 	// Session Cookie
 	response.addHeader("Set-Cookie", std::string(SESSIONID) + "=" + client.sessionId + "; Max-Age=" + to_string(MAX_SESSION_INACTIVITY) + "; Path=/; HttpOnly");
 
+	// Handle Content-Length for responses without body
+	if (response.getHeaders().hasKey("Content-Length") == false)
+		response.addHeader("Content-Length", to_string(response.getBody().size()));
+
 	std::string responseStr = response.toString();
 	_logger.logDebug("Response to client " + to_string(client.clientSocket) + ":\n" + responseStr);
 	ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), 0);
@@ -218,6 +221,7 @@ void ServerManager::handleWrite(int clientSocket)
 		removeClient(clientSocket);
 		return;
 	}
+	_logger.logInfo("Sent response to client " + to_string(client.clientSocket) + ", bytes sent: " + to_string(bytesSent));
 	_epoll.modifyClient(clientSocket, EPOLLIN);
 	// HttpResponse parseResponse(responseData)
 	// Add Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
