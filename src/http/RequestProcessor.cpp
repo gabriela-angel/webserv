@@ -557,7 +557,8 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& se
 	const ErrorPage&	location_pages = location->getErrorPages();
 	for (ErrorPageIt it = location_pages.begin(); it != location_pages.end(); ++it) {
 		if (it->first == status) {
-			serveFile(response, it->second, server, location);
+			std::string path = resolveFilePath(server, location, it->second);
+			serveFile(response, path, server, location);
 			return;
 		}
 	}
@@ -565,7 +566,11 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& se
 	const ErrorPage&	server_pages = server.getErrorPages();
 	for (ErrorPageIt it = server_pages.begin(); it != server_pages.end(); ++it) {
 		if (it->first == status) {
-			serveFile(response, it->second, server, location);
+			std::string path = it->second;
+			if (path[0] != '/')
+				path = "/" + path;
+			path = server.getRoot() + path;
+			serveFile(response, path, server, location);
 			return;
 		}
 	}
