@@ -505,6 +505,8 @@ LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerC
 			}
 		}
 	}
+	if (!best_match)
+		best_match = &server.getLocations()[0];
 	return best_match;
 }
 
