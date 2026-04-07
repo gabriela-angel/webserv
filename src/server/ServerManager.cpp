@@ -108,7 +108,7 @@ void ServerManager::removeSession(const std::string &sessionId)
 
 void ServerManager::removeClient(int clientSocket)
 {
-	_logger.logInfo("Removing client socket: " + to_string(clientSocket));
+	_logger.logDebug("Removing client socket: " + to_string(clientSocket));
 	_epoll.removeClient(clientSocket);
 	_clientMap.erase(clientSocket);
 	close(clientSocket);
