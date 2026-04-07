@@ -36,6 +36,10 @@ class   Headers {
 		Map											_headers;
 	
 	public:
+		static std::string							toUpper(const std::string& str);
+		static std::string							TrainCase(const std::string& str);
+		static bool									compare(const std::string& str1, const std::string& str2);
+
 		void										add(const std::string& key, const std::string& value);
 		void										remove(const std::string& key);
 		bool										hasKey(const std::string& key) const;
@@ -53,5 +57,5 @@ class   Headers {
 		Values &									at(const std::string& key);
 		const Values &								at(const std::string& key) const;
 
-		Values &									operator[](const std::string& key);		
+		Values &									operator[](const std::string& key);
 };

@@ -122,19 +122,39 @@ void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& respo
 		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
 		return;
 	}
+
+	std::string filepath = resolveFilePath(server, location, request.getUri());
+
+	if (isValidDirectory(filepath)) {
+		if (filepath[filepath.size() - 1] != '/')
+			filepath += '/';
+
+		const std::vector<std::string>* index_files = NULL;
+		if (location->hasIndexFiles())
+			index_files = &location->getIndexFiles();
+		else if (server.hasIndexFiles())
+			index_files = &server.getIndexFiles();
+
+		if (index_files) {
+			for (size_t i = 0; i < index_files->size(); i++) {
+				std::string index_path = filepath + (*index_files)[i];
+				if (isValidFile(index_path) && CgiHandler::tryRun(request, response, *location, index_path))
+					return;
+			}
+		}
+	}
+
+	if (isValidFile(filepath) && CgiHandler::tryRun(request, response, *location, filepath))
+		return;
  
 	const Headers& headers = request.getHeaders();
 	Headers::ConstIterator ct_it = headers.find("Content-Type");
-	if (ct_it != headers.end() && ct_it->second[0].find("multipart/form-data") != std::string::npos) {
+	if (ct_it != headers.end() && !ct_it->second.empty() && ct_it->second[0].find("multipart/form-data") != std::string::npos) {
 		if (handleMultipart(request, response, location))
 			response.setStatus(HttpStatus::CREATED);
 		return;
 	}
- 
-	std::string filepath = resolveFilePath(server, location, request.getUri());
- 
-	if (isValidFile(filepath) && CgiHandler::tryRun(request, response, *location, filepath))
-		return;
+
 	bool file_existed = false;
 	std::string dest = resolvePostDest(request, response, location, filepath, file_existed);
 	if (dest.empty())

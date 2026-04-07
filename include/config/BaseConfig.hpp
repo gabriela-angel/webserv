@@ -10,7 +10,7 @@
 # include "./utils.hpp"
 
 
-# define DEFAULT_CLIENT_MAX_BODY_SIZE 1048576 // CHECK MACRO LUIZ LATER
+# define DEFAULT_CLIENT_MAX_BODY_SIZE 1048576 * 3 // CHECK MACRO LUIZ LATER
 
 class BaseConfig {
 protected:
