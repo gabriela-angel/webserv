@@ -169,6 +169,7 @@ void ServerManager::handleRead(int clientSocket)
 	if (client.stateMachine.state == StateMachine::DONE || client.stateMachine.state == StateMachine::ERROR)
 	{
 		client.stateMachine.updateActivity();
+		client.stateMachine.state = StateMachine::READING_REQUEST_LINE; // Reset state for next request (if keep-alive)
 		_epoll.modifyClient(clientSocket, EPOLLOUT);
 		_handleSession(client);
 	}
@@ -203,6 +204,10 @@ void ServerManager::handleWrite(int clientSocket)
 	request.exception = client.exception;
 
 	HttpResponse response = RequestProcessor::process(request, _configs);
+
+	// Session Cookie
+	response.addHeader("Set-Cookie", std::string(SESSIONID) + "=" + client.sessionId + "; Max-Age=" + to_string(MAX_SESSION_INACTIVITY) + "; Path=/; HttpOnly");
+
 	std::string responseStr = response.toString();
 	_logger.logDebug("Response to client " + to_string(client.clientSocket) + ":\n" + responseStr);
 	ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), 0);
