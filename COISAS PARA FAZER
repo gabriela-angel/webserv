@@ -5,3 +5,9 @@ BUG AO REMOVER UM PONTO E VIRGULA DE ALGUMA LINHA DO CONFIG
 verificar corretamente request.exception na resposta
 
 default_server nao parece estar funcionando
+
+VERIFICAR LEAKS
+
+IMPLEMENTAR LOGIN
+
+MAIOR PARTE DOS ERROS TEM Q TER Connection: close E FECHAR O SOCKET

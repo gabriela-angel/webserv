@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 
 
-#define CLI_BUFFER_SIZE 4096
+#define CLI_BUFFER_SIZE 16384	// 16 KB
 #define CLI_FIRST_READ_TIMEOUT 5
 #define CLI_TIMEOUT 30
 

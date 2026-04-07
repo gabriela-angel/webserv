@@ -18,7 +18,7 @@ void EventLoop::run(){
 		int nfds = epoll_wait(_serverManager.getEpollFD(), _events, MAX_EVENTS, 1000); // 1000 ms timeout
 		if (_stopFlag) break; // Check if SIGINT was received during epoll_wait
 		if (nfds == -1) throw std::runtime_error("Failed to wait for epoll events");
-
+		_logger.logDebug("epoll_wait returned " + to_string(nfds) + " events");
 		// Process events
 		for (int i = 0; i < nfds; ++i)
 		{

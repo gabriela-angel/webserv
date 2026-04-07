@@ -44,3 +44,11 @@ std::string HttpResponse::toString() const {
 
 	return ret;
 }
+
+const Headers& HttpResponse::getHeaders() const {
+	return _headers;
+}
+
+const std::string& HttpResponse::getBody() const {
+	return _body;
+}
