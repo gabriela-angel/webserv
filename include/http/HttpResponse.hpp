@@ -9,9 +9,9 @@
 
 class HttpResponse {
 private:
-	HttpStatus::Code					_statusCode;
-	Headers								_headers;
-	std::string							_body;
+	HttpStatus::Code		_statusCode;
+	Headers					_headers;
+	std::string				_body;
 public:
 	HttpResponse();
 	HttpResponse(const HttpResponse& copy);
@@ -19,13 +19,14 @@ public:
 	~HttpResponse();
 
 	// methods tbd, BUT PROBABLY:
-	void setStatus(HttpStatus::Code status);
-	void addHeader(const std::string& key, const std::string& value);
-	void setBody(const std::string& body);
+	void					setStatus(HttpStatus::Code status);
+	void					addHeader(const std::string& key, const std::string& value);
+	void					setBody(const std::string& body);
 	
-	const Headers&		getHeaders() const;
-	const std::string&	getBody() const;
-	std::string			toString() const;
+	const HttpStatus::Code&	getStatus() const;
+	const Headers&			getHeaders() const;
+	const std::string&		getBody() const;
+	std::string				toString() const;
 };
 
 #endif

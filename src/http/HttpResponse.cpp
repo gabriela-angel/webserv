@@ -52,3 +52,7 @@ const Headers& HttpResponse::getHeaders() const {
 const std::string& HttpResponse::getBody() const {
 	return _body;
 }
+
+const HttpStatus::Code& HttpResponse::getStatus() const {
+	return _statusCode;
+}

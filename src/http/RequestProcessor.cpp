@@ -35,6 +35,7 @@ HttpResponse RequestProcessor::process(const HttpStruct& request, ManagerConfig&
 
 	if (!location) {
 		response.setStatus(HttpStatus::NOT_FOUND);
+		handlePageErrors(response, server, location);
 		return response;
 	}
 	if (location->hasRedirect()) {
@@ -48,10 +49,12 @@ HttpResponse RequestProcessor::process(const HttpStruct& request, ManagerConfig&
 			response.addHeader("Content-Type", "text/plain");
 			response.addHeader("Content-Length", itoa(static_cast<int>(location->getRedirectUrl().size())));
 		}
+		handlePageErrors(response, server, location);
 		return response;
 	}
 	if (!isMethodAllowed(request.getMethod(), *location)) {
 		response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
+		handlePageErrors(response, server, location);
 		return response;
 	}
 	
@@ -62,6 +65,7 @@ HttpResponse RequestProcessor::process(const HttpStruct& request, ManagerConfig&
 	else
 		handleDelete(request, response, server, location);
 
+	handlePageErrors(response, server, location);
 	return response;
 }
 
@@ -497,7 +501,7 @@ LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerC
 		if (prefix.length() > request_uri.length())
 			continue;
 		if (request_uri.compare(0, prefix.length(), prefix) == 0) {
-			if (request_uri.length() > prefix.length() && request_uri[prefix.length()] != '/')
+			if (request_uri.length() > prefix.length() && request_uri[prefix.length()] != '/' && prefix.length() > 1)
 				continue;
 			if (prefix.length() > match_length) {
 				match_length = prefix.length();
@@ -505,8 +509,6 @@ LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerC
 			}
 		}
 	}
-	if (!best_match)
-		best_match = &server.getLocations()[0];
 	return best_match;
 }
 
@@ -543,4 +545,29 @@ std::string RequestProcessor::resolveFilePath(ServerConfig& server, LocationConf
 		filepath = server.getRoot() + uri;
 	}
 	return filepath;
+}
+
+void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+	const int &status = response.getStatus();
+	
+	typedef std::map<int, std::string>	ErrorPage;
+	typedef ErrorPage::const_iterator	ErrorPageIt;
+
+
+	const ErrorPage&	location_pages = location->getErrorPages();
+	for (ErrorPageIt it = location_pages.begin(); it != location_pages.end(); ++it) {
+		if (it->first == status) {
+			serveFile(response, it->second, server, location);
+			return;
+		}
+	}
+
+	const ErrorPage&	server_pages = server.getErrorPages();
+	for (ErrorPageIt it = server_pages.begin(); it != server_pages.end(); ++it) {
+		if (it->first == status) {
+			serveFile(response, it->second, server, location);
+			return;
+		}
+	}
+		
 }
