@@ -25,17 +25,17 @@ static inline bool isReserved(char c) {
 }
 
 inline static void fillClientData(ClientData &client) {
-	Http::HeaderMap &headers = client.stateMachine.httpData.headers;
+	Headers &headers = client.stateMachine.httpData.headers;
 	StateMachine &stateMachine = client.stateMachine;
 	HttpData &httpData = stateMachine.httpData;
 
 	httpData.host = headers[HOST][0];
-	httpData.chunkedTransferEncoding = headers.count(TRANSFER_ENCODING) > 0;
-	httpData.contentLength = headers.count(CONTENT_LENGTH) > 0 ? from_string<long long>(headers[CONTENT_LENGTH][0]) : 0;
-	httpData.keepAlive = headers.count(CONNECTION) > 0 && headers[CONNECTION][0] == "keep-alive";
-	httpData.expectContinue = headers.count(EXPECT) > 0;
+	httpData.chunkedTransferEncoding = headers.hasKey(TRANSFER_ENCODING);
+	httpData.contentLength = headers.hasKey(CONTENT_LENGTH) ? from_string<long long>(headers[CONTENT_LENGTH][0]) : 0;
+	httpData.keepAlive = headers.hasKey(CONNECTION) && headers[CONNECTION][0] == "keep-alive";
+	httpData.expectContinue = headers.hasKey(EXPECT);
 
-	if (headers.count(CONTENT_LENGTH) > 0 || headers.count(TRANSFER_ENCODING) > 0) {
+	if (headers.hasKey(CONTENT_LENGTH) || headers.hasKey(TRANSFER_ENCODING)) {
 		stateMachine.state = StateMachine::READING_BODY;
 	} else {
 		stateMachine.state = StateMachine::DONE;
@@ -63,7 +63,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 	StateMachine &stateMachine = client.stateMachine;
 	std::string &buffer = stateMachine.buffer;
 
-	switch (stateMachine.state) {
+	 switch (stateMachine.state){
 		case StateMachine::READING_REQUEST_LINE:
 			try {
 				_logger.logDebug("Client " + to_string(client.clientSocket) + " State: READING_REQUEST_LINE");
@@ -84,7 +84,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 		case StateMachine::READING_HEADERS:
 			try {
 				_logger.logDebug("Client " + to_string(client.clientSocket) + " State: READING_HEADERS");
-				HttpPart<HeaderMap> part = _parseHeaders(buffer);
+				HttpPart<Headers> part = _parseHeaders(buffer);
 
 				// If size is 0, it means we don't have complete headers yet, so we wait for more data
 				if (part.size == 0) return true;
@@ -132,12 +132,12 @@ bool HttpRequest::_processClientState(ClientData &client) {
 
 void HttpRequest::_parseCookies(ClientData &client) {
 	HttpData &httpData = client.stateMachine.httpData;
-	HeaderMap &headers = httpData.headers;
+	Headers &headers = httpData.headers;
 	Cookies &cookies = httpData.cookies;
 
-	if (headers.count(COOKIE) > 0) {
-		const HeaderValues &cookieValues = headers[COOKIE];
-		for (ConstHeaderValueIterator it = cookieValues.begin(); it != cookieValues.end(); ++it) {
+	if (headers.hasKey(COOKIE)) {
+		const Headers::Values &cookieValues = headers[COOKIE];
+		for (Headers::ConstValueIterator it = cookieValues.begin(); it != cookieValues.end(); ++it) {
 			const std::string &cookieHeader = *it;
 			std::vector<std::string> cookiePairs = split(cookieHeader, ';');
 			for (size_t i = 0; i < cookiePairs.size(); ++i) {
@@ -226,16 +226,16 @@ void HttpRequest::_validateRequestLine(const RequestLine &requestLine)
 		throw HttpException(HttpException::ParseError::HTTP_VERSION_NOT_SUPPORTED);
 }
 
-HttpPart<Http::HeaderMap> HttpRequest::_parseHeaders(const std::string &buffer)
+HttpPart<Headers> HttpRequest::_parseHeaders(const std::string &buffer)
 {
 	if (buffer.size() > MAX_HEADER_SIZE)
 	throw HttpException(HttpException::ParseError::HEADERS_TOO_LARGE);
 	
 	// Check if we have the end of headers
 	size_t end = buffer.find(HEADER_END);
-	if (end == std::string::npos) return HttpPart<Http::HeaderMap>();
+	if (end == std::string::npos) return HttpPart<Headers>();
 
-	Http::HeaderMap headers;
+	Headers headers;
 	size_t start = 0;
 
 	size_t headerCount = 0;
@@ -258,16 +258,15 @@ HttpPart<Http::HeaderMap> HttpRequest::_parseHeaders(const std::string &buffer)
 
 
 
-		std::string name = line.substr(0, colonPos);
+		std::string key = line.substr(0, colonPos);
 		std::string value = line.substr(colonPos + 1);
 
 
-		for (size_t i = 0; i < name.size(); ++i)
+		for (size_t i = 0; i < key.size(); ++i)
         {
-            unsigned char c = name[i];
+            unsigned char c = key[i];
             if (!isValidTokenChar(c))
                 throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-			name[i] = std::toupper(c);
         }
 
 
@@ -283,7 +282,7 @@ HttpPart<Http::HeaderMap> HttpRequest::_parseHeaders(const std::string &buffer)
 				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
 		}
 
-		headers[name].push_back(value);
+		headers.add(key, value);
 		headerCount++;
 		start = lineEnd + 2; // Move past CRLF
 	}
@@ -291,166 +290,167 @@ HttpPart<Http::HeaderMap> HttpRequest::_parseHeaders(const std::string &buffer)
 	if (headerCount > MAX_HEADERS)
 		throw HttpException(HttpException::ParseError::HEADERS_TOO_LARGE);
 
-	HttpPart<Http::HeaderMap> part;
+	HttpPart<Headers> part;
 	part.value = headers;
 	part.size = end + 4; // Include the size of the delimiter
 	return part;
 }
 
-void HttpRequest::_validateHeaders(const Http::HeaderMap &headers)
+void HttpRequest::_validateHeaders(const Headers &headers)
 {
 	bool hasContentLength = false;
 	bool hasTransferEncoding = false;
 	bool hasHost = false;
-	for (ConstHeaderIterator it = headers.begin(); it != headers.end(); ++it) {
-		const HeaderKey &name = it->first;
-		const HeaderValues &values = it->second;
 
 	/* Validate CONTENT-LENGTH */
-		if (name == CONTENT_LENGTH) {
-			hasContentLength = true;
-			std::string mainValue = values[0];
+	if (headers.hasKey(CONTENT_LENGTH)) {
+		hasContentLength = true;
+		Headers::Values values = headers.find(CONTENT_LENGTH)->second;
+		std::string mainValue = values[0];
 
-			// Content-Length cannot be empty
-			if (mainValue.empty())
+		// Content-Length cannot be empty
+		if (mainValue.empty())
+			throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
+
+		// If we find a different value, it's a malformed header
+		for (Headers::ConstValueIterator itValue = values.begin(); itValue != values.end(); ++itValue)
+			if (*itValue != mainValue)
+				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+
+		// Check if the value is a valid non-negative integer and within the allowed body size
+		for (size_t i = 0; i < mainValue.size(); ++i)
+			if (!std::isdigit(static_cast<unsigned char>(mainValue[i])))
 				throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
+		
+		// Convert to long long and check range
+		long long contentLength = from_string<long long>(mainValue);
+		if (contentLength < 0 || contentLength > MAX_BODY_SIZE)
+			throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
 
-			// If we find a different value, it's a malformed header
-			for (ConstHeaderValueIterator itValue = values.begin(); itValue != values.end(); ++itValue)
-				if (*itValue != mainValue)
-					throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-
-			// Check if the value is a valid non-negative integer and within the allowed body size
-			for (size_t i = 0; i < mainValue.size(); ++i)
-				if (!std::isdigit(static_cast<unsigned char>(mainValue[i])))
-					throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
-			
-			// Convert to long long and check range
-			long long contentLength = from_string<long long>(mainValue);
-			if (contentLength < 0 || contentLength > MAX_BODY_SIZE)
-				throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
-
-			// If Content-Length AND Transfer-Encoding is present, it's an error
-			if (hasTransferEncoding)
-				throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
-		}
+		// If Content-Length AND Transfer-Encoding is present, it's an error
+		if (hasTransferEncoding)
+			throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
+	}
 
 	/* Validate TRANSFER-ENCODING */
-		if (name == TRANSFER_ENCODING) {
-			hasTransferEncoding = true;
+	if (headers.hasKey(TRANSFER_ENCODING)) {
+		hasTransferEncoding = true;
+		Headers::Values values = headers.find(TRANSFER_ENCODING)->second;
+		// has only one value and it must be "chunked"
+		if (values.size() != 1 || values[0] != "chunked")
+			throw HttpException(HttpException::ParseError::INVALID_TRANSFER_ENCODING);			
 
-			// has only one value and it must be "chunked"
-			if (values.size() != 1 || values[0] != "chunked")
-				throw HttpException(HttpException::ParseError::INVALID_TRANSFER_ENCODING);			
-
-			// If Transfer-Encoding AND Content-Length is present, it's an error
-			if (hasContentLength)
-				throw HttpException(HttpException::ParseError::INVALID_TRANSFER_ENCODING);
-		}
+		// If Transfer-Encoding AND Content-Length is present, it's an error
+		if (hasContentLength)
+			throw HttpException(HttpException::ParseError::INVALID_TRANSFER_ENCODING);
+	}
 	
 	/* Validate HOST */
-		if (name == HOST)
-		{
-			hasHost = true;
-			if (values.size() != 1)
+	if (headers.hasKey(HOST))
+	{
+		hasHost = true;
+		Headers::Values values = headers.find(HOST)->second;
+		if (values.size() != 1)
+			throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+		std::string host = values[0];
+		if (host.empty())
+			throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+		
+		// Validate host format
+		size_t colonPos = host.find(':');
+		std::string hostname = (colonPos == std::string::npos) ? host : host.substr(0, colonPos);
+		std::string portStr = (colonPos == std::string::npos) ? "" : host.substr(colonPos + 1);
+
+		// Validate hostname
+		if (hostname.size() > MAX_HOST_SIZE)
+			throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+
+		typedef std::vector<std::string>	StringVector;
+		typedef StringVector::iterator		StringVectorIterator;
+
+		StringVector labels = split(hostname, '.');
+		for (StringVectorIterator it = labels.begin(); it != labels.end(); ++it) {
+			const std::string &label = *it;
+			if (label.empty() || label.size() > MAX_HOST_LABEL_SIZE)
 				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-			std::string host = values[0];
-			if (host.empty())
+			if (!std::isalnum(static_cast<unsigned char>(label[0])) || !std::isalnum(static_cast<unsigned char>(label[label.size() - 1])))
 				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-			
-			// Validate host format
-			size_t colonPos = host.find(':');
-			std::string hostname = (colonPos == std::string::npos) ? host : host.substr(0, colonPos);
-			std::string portStr = (colonPos == std::string::npos) ? "" : host.substr(colonPos + 1);
-
-			// Validate hostname
-			if (hostname.size() > MAX_HOST_SIZE)
-				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-
-			typedef std::vector<std::string>	StringVector;
-			typedef StringVector::iterator		StringVectorIterator;
-
-			StringVector labels = split(hostname, '.');
-			for (StringVectorIterator it = labels.begin(); it != labels.end(); ++it) {
-				const std::string &label = *it;
-				if (label.empty() || label.size() > MAX_HOST_LABEL_SIZE)
-					throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-				if (!std::isalnum(static_cast<unsigned char>(label[0])) || !std::isalnum(static_cast<unsigned char>(label[label.size() - 1])))
-					throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-				for (size_t i = 1; i < label.size() - 1; ++i) {
-					char c = label[i];
-					if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-')
-						throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-				}
-			}
-
-			// Validate port if present
-			if (!portStr.empty()) {
-				if (portStr.size() > 5) // Max port number is 65535
-					throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-				for (size_t i = 0; i < portStr.size(); ++i)
-					if (!std::isdigit(static_cast<unsigned char>(portStr[i])))
-						throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-				int port = from_string<int>(portStr);
-				if (port < 1 || port > 65535)
+			for (size_t i = 1; i < label.size() - 1; ++i) {
+				char c = label[i];
+				if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-')
 					throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
 			}
 		}
+
+		// Validate port if present
+		if (!portStr.empty()) {
+			if (portStr.size() > 5) // Max port number is 65535
+				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+			for (size_t i = 0; i < portStr.size(); ++i)
+				if (!std::isdigit(static_cast<unsigned char>(portStr[i])))
+					throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+			int port = from_string<int>(portStr);
+			if (port < 1 || port > 65535)
+				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+		}
+	}
 	
 	/* Validate CONNECTION */
-		if (name == CONNECTION) {
-			// If we have multiple Connection headers or multiple values, it's a malformed header
-			if (values.size() > 1)
-				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+	if (headers.hasKey(CONNECTION)) {
+		Headers::Values values = headers.find(CONNECTION)->second;
+		// If we have multiple Connection headers or multiple values, it's a malformed header
+		if (values.size() > 1)
+			throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
 
-			std::string value = values[0];
-			if (value != "keep-alive" && value != "close")
-				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-		}
+		std::string value = values[0];
+		if (value != "keep-alive" && value != "close")
+			throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+	}
 	
 	/* Validate EXPECT */
-		if (name == EXPECT) {
-			// If we have multiple Expect headers or multiple values, it's a malformed header
-			if (values.size() > 1 || values[0] != "100-continue")
-				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-			
-			// If Expect is present without Content-Length or Transfer-Encoding, it's an LENGTH_REQUIRED error
-			if (!hasContentLength && !hasTransferEncoding)
-				throw HttpException(HttpException::ParseError::LENGTH_REQUIRED);
-		}
+	if (headers.hasKey(EXPECT)) {
+		Headers::Values values = headers.find(EXPECT)->second;
+		// If we have multiple Expect headers or multiple values, it's a malformed header
+		if (values.size() > 1 || values[0] != "100-continue")
+			throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+		
+		// If Expect is present without Content-Length or Transfer-Encoding, it's an LENGTH_REQUIRED error
+		if (!hasContentLength && !hasTransferEncoding)
+			throw HttpException(HttpException::ParseError::LENGTH_REQUIRED);
+	}
 
 	/* Validate CONTENT-TYPE */
-		if (name == CONTENT_TYPE) {
-			if (values.size() != 1)
-				throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
+	if (headers.hasKey(CONTENT_TYPE)) {
+		Headers::Values values = headers.find(CONTENT_TYPE)->second;
+		if (values.size() != 1)
+			throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
 
-			// Ex: "text/html; charset=UTF-8; boundary=something"
-			std::string value = values[0];
-			
-			
-			std::vector<std::string> parts = split(value, ';');
-			if (parts.empty())
+		// Ex: "text/html; charset=UTF-8; boundary=something"
+		std::string value = values[0];
+		
+		
+		std::vector<std::string> parts = split(value, ';');
+		if (parts.empty())
+			throw HttpException(HttpException::ParseError::UNSUPPORTED_MEDIA_TYPE);
+		
+		std::string mediaType = parts[0];
+		std::vector<std::string> mediaTypeParts = split(mediaType, '/');
+		if (mediaTypeParts.size() != 2)
+			throw HttpException(HttpException::ParseError::UNSUPPORTED_MEDIA_TYPE);
+		
+		std::vector<std::string> parameters(parts.begin() + 1, parts.end());
+		
+		for (std::vector<std::string>::iterator it = parameters.begin(); it != parameters.end(); ++it) {
+			std::string param = trim(*it);
+			size_t equalsPos = param.find('=');
+			if (equalsPos == std::string::npos)
 				throw HttpException(HttpException::ParseError::UNSUPPORTED_MEDIA_TYPE);
-			
-			std::string mediaType = parts[0];
-			std::vector<std::string> mediaTypeParts = split(mediaType, '/');
-			if (mediaTypeParts.size() != 2)
-				throw HttpException(HttpException::ParseError::UNSUPPORTED_MEDIA_TYPE);
-			
-			std::vector<std::string> parameters(parts.begin() + 1, parts.end());
-			
-			for (std::vector<std::string>::iterator it = parameters.begin(); it != parameters.end(); ++it) {
-				std::string param = trim(*it);
-				size_t equalsPos = param.find('=');
-				if (equalsPos == std::string::npos)
-					throw HttpException(HttpException::ParseError::UNSUPPORTED_MEDIA_TYPE);
-			}
 		}
+	}
 
 	/* Validate RANGE */
 	// Range will be ignored for now.
-
-	}
+	
 	if (!hasHost)
 		throw HttpException(HttpException::ParseError::MISSING_HOST_HEADER);
 }
@@ -482,69 +482,3 @@ HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 
 	return HttpPart<std::string>(); // No body expected (connection will close in CLI_TIMEOUT seconds)
 }
-
-// // EXAMPLE FOR TESTING PURPOSES
-
-// #include "./http/HttpRequest.hpp"
-
-// HttpRequest::HttpRequest()
-// 	: _method("GET"), _uri("/"), _version("HTTP/1.1"), _port(80) {}
-
-// HttpRequest::HttpRequest(
-// 	const std::string& method,
-// 	const std::string& uri,
-// 	const std::string& version,
-// 	const std::map<std::string, std::string>& headers,
-// 	const std::string& body,
-// 	const std::string& host,
-// 	int port
-// )
-// 	: _method(method), _uri(uri), _version(version),
-// 	  _headers(headers), _body(body), _host(host), _port(port) {}
-
-// HttpRequest::HttpRequest(const HttpRequest& copy) {
-// 	*this = copy;
-// }
-
-// HttpRequest& HttpRequest::operator=(const HttpRequest& other) {
-// 	if (this != &other) {
-// 		_method  = other._method;
-// 		_uri     = other._uri;
-// 		_version = other._version;
-// 		_headers = other._headers;
-// 		_body    = other._body;
-// 		_host    = other._host;
-// 		_port    = other._port;
-// 	}
-// 	return *this;
-// }
-
-// HttpRequest::~HttpRequest() {}
-
-// const std::string& HttpRequest::getMethod() const {
-// 	return _method;
-// }
-
-// const std::string& HttpRequest::getUri() const {
-// 	return _uri;
-// }
-
-// const std::string& HttpRequest::getVersion() const {
-// 	return _version;
-// }
-
-// const std::map<std::string, std::string>& HttpRequest::getHeaders() const {
-// 	return _headers;
-// }
-
-// const std::string& HttpRequest::getBody() const {
-// 	return _body;
-// }
-
-// const std::string& HttpRequest::getHostHeader() const {
-// 	return _host;
-// }
-
-// int HttpRequest::getPort() const {
-// 	return _port;
-// }

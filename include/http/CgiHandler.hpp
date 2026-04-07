@@ -1,18 +1,26 @@
 #ifndef CGIHANDLER_HPP
 # define CGIHANDLER_HPP
 
-# include "./http/HttpRequest.hpp"
-# include "./http/HttpResponse.hpp"
-# include "./config/LocationConfig.hpp"
+# include "HttpRequest.hpp"
+# include "HttpResponse.hpp"
+# include "LocationConfig.hpp"
 # include <string>
 # include <map>
+# include <cstdlib>
+# include <cstring>
+# include <sstream>
+# include <vector>
+# include <unistd.h>
+# include <sys/wait.h>
+# include <fcntl.h>
+# include <errno.h>
 
 class CgiHandler {
 public:
 	// Returns true and fills response if the file is a CGI script.
 	// Returns false if the extension is not registered as CGI (caller serves statically).
 	static bool tryRun(
-		const HttpRequest&   request,
+		const struct HttpStruct&   request,
 		HttpResponse&        response,
 		const LocationConfig& location,
 		const std::string&   filepath
@@ -24,7 +32,7 @@ private:
 
 	// Builds the CGI environment vector (caller must free with freeEnv)
 	static char** buildEnv(
-		const HttpRequest&  request,
+		const struct HttpStruct&  request,
 		const std::string&  filepath,
 		const std::string&  interpreter
 	);

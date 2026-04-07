@@ -28,7 +28,7 @@
 
 #include "./http/RequestProcessor.hpp"
 
-HttpResponse RequestProcessor::process(const HttpRequest& request, ManagerConfig& config) {
+HttpResponse RequestProcessor::process(const HttpStruct& request, ManagerConfig& config) {
 	HttpResponse response;
 	ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
 	LocationConfig* location = matchLocation(request.getUri(), server);
@@ -67,7 +67,7 @@ HttpResponse RequestProcessor::process(const HttpRequest& request, ManagerConfig
 
 // METHOD RELATED ---------------------------------------------------------------------------------
 
-void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
 
 	if (isValidDirectory(filepath)) {
@@ -110,7 +110,7 @@ void RequestProcessor::handleGet(const HttpRequest& request, HttpResponse& respo
 }
 
 
-void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
 	size_t max_body_size = location->hasMaxBodySize()
 		? location->getClientMaxBodySize()
 		: server.getClientMaxBodySize();
@@ -119,9 +119,9 @@ void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& resp
 		return;
 	}
  
-	const std::map<std::string, std::string>& headers = request.getHeaders();
-	std::map<std::string, std::string>::const_iterator ct_it = headers.find("Content-Type");
-	if (ct_it != headers.end() && ct_it->second.find("multipart/form-data") != std::string::npos) {
+	const Headers& headers = request.getHeaders();
+	Headers::ConstIterator ct_it = headers.find("Content-Type");
+	if (ct_it != headers.end() && ct_it->second[0].find("multipart/form-data") != std::string::npos) {
 		if (handleMultipart(request, response, location))
 			response.setStatus(HttpStatus::CREATED);
 		return;
@@ -152,7 +152,7 @@ void RequestProcessor::handlePost(const HttpRequest& request, HttpResponse& resp
 	response.addHeader("Content-Type", "text/plain");
 }
  
-void RequestProcessor::handleDelete(const HttpRequest& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
  
 	if (!isValidFile(filepath) && !isValidDirectory(filepath)) {
@@ -329,7 +329,7 @@ bool RequestProcessor::writeToFile(const std::string& dest, const std::string& b
 
 // Resolves the destination path for a POST and sets file_existed.
 // Returns an empty string and sets the response status on error.
-std::string RequestProcessor::resolvePostDest(const HttpRequest& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed) {
+std::string RequestProcessor::resolvePostDest(const HttpStruct& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed) {
 	if (isValidDirectory(filepath)) {
 		std::string upload_dir = location->getUpload();
 		if (upload_dir.empty() || !isValidDirectory(upload_dir) || access(upload_dir.c_str(), W_OK) != 0) {
@@ -338,9 +338,9 @@ std::string RequestProcessor::resolvePostDest(const HttpRequest& request, HttpRe
 		}
 		if (upload_dir[upload_dir.size() - 1] != '/')
 			upload_dir += '/';
-		const std::map<std::string, std::string>& hdrs = request.getHeaders();
-		std::map<std::string, std::string>::const_iterator cd_it = hdrs.find("Content-Disposition");
-		std::string disposition = (cd_it != hdrs.end()) ? cd_it->second : "";
+		const Headers& hdrs = request.getHeaders();
+		Headers::ConstIterator cd_it = hdrs.find("Content-Disposition");
+		std::string disposition = (cd_it != hdrs.end()) ? cd_it->second[0] : "";
 		std::string dest = upload_dir + extractFilename(disposition);
 		file_existed = isValidFile(dest);
 		return dest;
@@ -376,8 +376,8 @@ std::string RequestProcessor::resolvePostDest(const HttpRequest& request, HttpRe
  
 
 // Handles multipart/form-data uploads: parses each part and saves files to upload_dir
-bool RequestProcessor::handleMultipart(const HttpRequest& request, HttpResponse& response, LocationConfig* location) {
-	const std::map<std::string, std::string>& headers = request.getHeaders();
+bool RequestProcessor::handleMultipart(const HttpStruct& request, HttpResponse& response, LocationConfig* location) {
+	const Headers& headers = request.getHeaders();
  
 	std::string upload_dir = location->getUpload();
 	if (upload_dir.empty() || !isValidDirectory(upload_dir) || access(upload_dir.c_str(), W_OK) != 0) {
@@ -385,12 +385,12 @@ bool RequestProcessor::handleMultipart(const HttpRequest& request, HttpResponse&
 		return false;
 	}
  
-	std::map<std::string, std::string>::const_iterator ct_it = headers.find("Content-Type");
+	Headers::ConstIterator ct_it = headers.find("Content-Type");
 	if (ct_it == headers.end()) {
 		response.setStatus(HttpStatus::BAD_REQUEST);
 		return false;
 	}
-	std::string boundary = extractHeaderAttribute(ct_it->second, "boundary");
+	std::string boundary = extractHeaderAttribute(ct_it->second[0], "boundary");
 	if (boundary.empty()) {
 		response.setStatus(HttpStatus::BAD_REQUEST);
 		return false;

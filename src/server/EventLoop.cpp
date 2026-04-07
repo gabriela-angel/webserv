@@ -1,15 +1,12 @@
 #include "EventLoop.hpp"
 
 EventLoop::~EventLoop() {}
-EventLoop::EventLoop(const char *configFilePath) : _logger(Logger::getInstance()), _serverManager()
-{
-	(void)configFilePath;
-}
+EventLoop::EventLoop(const char *configFilePath) : _logger(Logger::getInstance()), _serverManager(configFilePath) {}
 
 std::sig_atomic_t	_stopFlag = 0;
 void handle_sigint(int)
 {
-	Logger::getInstance().logInfo("SIGINT received, shutting down gracefully...");
+	Logger::getInstance().logDebug("SIGINT received, shutting down gracefully...");
 	_stopFlag = 1;
 }
 
@@ -45,14 +42,14 @@ void EventLoop::run(){
 			// 2️⃣ Handle readable
 			if (_events[i].events & EPOLLIN)
 			{
-				_logger.logInfo("Data available to read on socket: " + to_string(_events[i].data.fd));
+				_logger.logDebug("Data available to read on socket: " + to_string(_events[i].data.fd));
 				_serverManager.handleRead(_events[i].data.fd);
 			}
 
 			// 3️⃣ Handle writable
 			if (_events[i].events & EPOLLOUT)
 			{
-				_logger.logInfo("Ready to write on socket: " + to_string(_events[i].data.fd));
+				_logger.logDebug("Ready to write on socket: " + to_string(_events[i].data.fd));
 				_serverManager.handleWrite(_events[i].data.fd);
 			}
 		}

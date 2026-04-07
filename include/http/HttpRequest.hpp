@@ -30,8 +30,8 @@ class HttpRequest : public Http {
 		static HttpPart<RequestLine>	_parseRequestLine(const std::string &buffer);
 		static void						_validateRequestLine(const RequestLine &requestLine);
 
-		static HttpPart<HeaderMap>		_parseHeaders(const std::string &buffer);
-		static void						_validateHeaders(const HeaderMap &headers);
+		static HttpPart<Headers>		_parseHeaders(const std::string &buffer);
+		static void						_validateHeaders(const Headers &headers);
 
 		// This function parses the body and validates it according to the headers (Content-Length, Transfer-Encoding, etc.)
 		static HttpPart<std::string>	_parseBody(struct StateMachine &stateMachine);

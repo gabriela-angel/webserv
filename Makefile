@@ -35,38 +35,33 @@ INCLUDES = $(shell find $(HEADER_PATH) -type d -exec echo -I{} \;)
 BUILD_PATH = ./build/
 LOGS_PATH = ./logs/
 
-UTILS_PATH = ./utils/
-<<<<<<< main
+CONFIG_PATH = ./config/
 SERVER_PATH = ./server/
+UTILS_PATH = ./utils/
 HTTP_PATH = ./http/
+
+
+
 FILES = \
 	main.cpp \
 	$(UTILS_PATH)Logger.cpp \
 	$(HTTP_PATH)HttpRequest.cpp \
 	$(HTTP_PATH)HttpException.cpp \
-	$(SERVER_PATH)Server.cpp \
+	$(HTTP_PATH)HttpResponse.cpp \
+	$(HTTP_PATH)Headers.cpp \
+	$(SERVER_PATH)Socket.cpp \
 	$(SERVER_PATH)EpollManager.cpp \
 	$(SERVER_PATH)ServerManager.cpp \
-	$(SERVER_PATH)EventLoop.cpp
-=======
-CONFIG_PATH = ./config/
-HTTP_PATH = ./http/
-FILES = \
-	main.cpp \
-	$(UTILS_PATH)Logger.cpp \
+	$(SERVER_PATH)EventLoop.cpp \
 	$(CONFIG_PATH)ParseConfig.cpp \
 	$(CONFIG_PATH)ManagerConfig.cpp \
 	$(CONFIG_PATH)ServerConfig.cpp \
 	$(CONFIG_PATH)LocationConfig.cpp \
 	$(CONFIG_PATH)BaseConfig.cpp \
-<<<<<<< HEAD
->>>>>>> master
-=======
-	$(HTTP_PATH)HttpRequest.cpp \
-	$(HTTP_PATH)HttpResponse.cpp \
-	$(HTTP_PATH)RequestProcessor.cpp \
 	$(HTTP_PATH)CgiHandler.cpp \
->>>>>>> location-route
+	$(HTTP_PATH)RequestProcessor.cpp \
+
+
 
 OBJS = $(addprefix $(BUILD_PATH), $(FILES:%.cpp=%.o))
 

@@ -1,20 +1,48 @@
 #include "ServerManager.hpp"
 #include "HttpRequest.hpp"
+#include "RequestProcessor.hpp"
 
-inline static std::string inetNtop(uint32_t binary_ip)
+std::vector<Socket::Config> mapSocketConfig(const std::vector<ServerConfig> &servers)
 {
-	uint32_t host_ip = ntohl(binary_ip);
+	
+	typedef std::vector<ServerConfig> ServerConfigVector;
+	typedef ServerConfigVector::const_iterator ServerConfigIterator;
 
-	int byte1 = (host_ip >> 24) & 0xFF;
-	int byte2 = (host_ip >> 16) & 0xFF;
-	int byte3 = (host_ip >> 8) & 0xFF;
-	int byte4 = host_ip & 0xFF;
-	std::ostringstream ip_stream;
-	ip_stream << byte1 << "." << byte2 << "." << byte3 << "." << byte4;
-	return ip_stream.str();
+	std::vector<Socket::Config> socketConfigs;
+	for(ServerConfigIterator it = servers.begin(); it != servers.end(); ++it)
+	{
+		ServerConfig serverConfig = *it;
+		std::vector<ServerConfig::ListenDirective> listens = serverConfig.getPortPair();
+
+		for (size_t i = 0; i < listens.size(); i++)
+		{
+			
+			Socket::Config config;
+			config.address = inet_addr(listens[i].host.c_str());
+			config.port = listens[i].port;
+
+			bool duplicate = false;
+			for (size_t j = 0; j < socketConfigs.size(); j++)
+			{
+				if (socketConfigs[j].address == config.address && socketConfigs[j].port == config.port)
+				{
+					duplicate = true;
+					break;
+				}
+			}
+			if (!duplicate)
+				socketConfigs.push_back(config);
+		}
+	}
+	return socketConfigs;
 }
 
-ServerManager::ServerManager() : _logger(Logger::getInstance()), _epoll(EpollManager::getInstance())
+
+ServerManager::ServerManager(const char *configFilePath)
+:
+	_logger(Logger::getInstance()),
+	_epoll(EpollManager::getInstance()),
+	_configs(ParseConfig(configFilePath).parse())
 {
 	/*-- Prepare to generate secure session IDs --*/
 	_urandom_fd = open("/dev/urandom", O_RDONLY);
@@ -22,21 +50,30 @@ ServerManager::ServerManager() : _logger(Logger::getInstance()), _epoll(EpollMan
 		throw std::runtime_error("Failed to open /dev/urandom, cannot generate secure session IDs");
 
 	/*-- Starting Servers --*/
-	Server *newServer = new Server();
-	if (!newServer->init())
+
+	typedef std::vector<Socket::Config> SocketConfigVector;
+	typedef SocketConfigVector::const_iterator SocketConfigIterator;
+	SocketConfigVector socketsToCreate = mapSocketConfig(_configs.getServers());
+
+	for(SocketConfigIterator it = socketsToCreate.begin(); it != socketsToCreate.end(); ++it)
 	{
-		delete newServer;
-		throw std::runtime_error("Failed to initialize the server");
+		Socket *newSocket = new Socket(*it);
+		if (!newSocket->init())
+		{
+			delete newSocket;
+			throw std::runtime_error("Failed to initialize socket on " + Socket::inetNtop(it->address) + ":" + to_string(it->port));
+		}
+		_sockets.push_back(newSocket);
+		_epoll.addServer(newSocket->getFD());
 	}
-	_servers.push_back(newServer);
-	_epoll.addServer(newServer->getSocket());
 }
+
 ServerManager::~ServerManager()
 {
 	close(_urandom_fd);
 	for (ClientIterator it = _clientMap.begin(); it != _clientMap.end(); ++it)
 		close(it->first);
-	for (std::vector<Server *>::iterator it = _servers.begin(); it != _servers.end(); ++it)
+	for (std::vector<Socket *>::iterator it = _sockets.begin(); it != _sockets.end(); ++it)
 		delete *it;
 }
 
@@ -99,7 +136,7 @@ void ServerManager::acceptConnection( int serverSocket ){
 		return;
 	}
 	
-	_logger.logInfo("Accepted new connection from " + std::string(inetNtop(client_addr.sin_addr.s_addr)) + ":" + to_string(ntohs(client_addr.sin_port)));
+	_logger.logInfo("Accepted new connection from " + std::string(Socket::inetNtop(client_addr.sin_addr.s_addr)) + ":" + to_string(ntohs(client_addr.sin_port)));
 	_epoll.addClient(client_socket, EPOLLIN);
 	_clientMap[client_socket] = ClientData(client_addr, client_socket, serverSocket);
 }
@@ -132,6 +169,7 @@ void ServerManager::handleRead(int clientSocket)
 	if (client.stateMachine.state == StateMachine::DONE || client.stateMachine.state == StateMachine::ERROR)
 	{
 		client.stateMachine.updateActivity();
+		client.stateMachine.state = StateMachine::READING_REQUEST_LINE; // Reset state for next request (if keep-alive)
 		_epoll.modifyClient(clientSocket, EPOLLOUT);
 		_handleSession(client);
 	}
@@ -142,17 +180,45 @@ void ServerManager::handleWrite(int clientSocket)
 	ClientData &client = _clientMap[clientSocket];
 	HttpData &httpData = client.stateMachine.httpData;
 	
- 	ResponseData responseData;
+ 	HttpStruct request;
 
-	responseData.method = httpData.requestLine.method;
-	responseData.HTTPVersion = httpData.requestLine.version;
-	responseData.uri = httpData.requestLine.uri;
-	responseData.host = httpData.host;
-	responseData.headers = httpData.headers;
-	if (responseData.method == "POST" || responseData.method == "PUT")
-		responseData.body = httpData.body;
-	responseData.exception = client.exception;
+	request.method = httpData.requestLine.method;
+	request.HTTPVersion = httpData.requestLine.version;
+	request.uri = httpData.requestLine.uri;
+	request.headers = httpData.headers;
+	
+	// Host and Port
+	request.host = httpData.host;
+	request.port = 80; // Default HTTP port
 
+	size_t colon_pos = httpData.host.find(':');
+	if (colon_pos != std::string::npos)
+	{
+		request.host = httpData.host.substr(0, colon_pos);
+		request.port = from_string<int>(httpData.host.substr(colon_pos + 1));
+	}
+
+
+	if (request.method == "POST" || request.method == "PUT")
+		request.body = httpData.body;
+	request.exception = client.exception;
+
+	HttpResponse response = RequestProcessor::process(request, _configs);
+
+	// Session Cookie
+	response.addHeader("Set-Cookie", std::string(SESSIONID) + "=" + client.sessionId + "; Max-Age=" + to_string(MAX_SESSION_INACTIVITY) + "; Path=/; HttpOnly");
+
+	std::string responseStr = response.toString();
+	_logger.logDebug("Response to client " + to_string(client.clientSocket) + ":\n" + responseStr);
+	ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), 0);
+	if (bytesSent < 0)	{
+		_logger.logError("Error sending response to client socket");
+		_logger.logDebug("error code: " + to_string(errno));
+		_logger.logDebug("error message: " + std::string(strerror(errno)));
+		removeClient(clientSocket);
+		return;
+	}
+	_epoll.modifyClient(clientSocket, EPOLLIN);
 	// HttpResponse parseResponse(responseData)
 	// Add Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
 	
