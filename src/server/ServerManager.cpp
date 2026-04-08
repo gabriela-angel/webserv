@@ -2,7 +2,7 @@
 #include "HttpRequest.hpp"
 #include "RequestProcessor.hpp"
 
-std::vector<Socket::Config> mapSocketConfig(const std::vector<ServerConfig> &servers)
+inline static std::vector<Socket::Config> mapSocketConfig(const std::vector<ServerConfig> &servers)
 {
 	
 	typedef std::vector<ServerConfig> ServerConfigVector;
@@ -177,6 +177,16 @@ void ServerManager::handleRead(int clientSocket)
 void ServerManager::handleWrite(int clientSocket)
 {
 	ClientData &client = _clientMap[clientSocket];
+
+	if (client.exception)
+	{
+		
+		return ;
+	}
+
+
+
+
 	HttpData &httpData = client.stateMachine.httpData;
 	
  	HttpStruct request;
@@ -197,10 +207,10 @@ void ServerManager::handleWrite(int clientSocket)
 		request.port = from_string<int>(httpData.host.substr(colon_pos + 1));
 	}
 
-
 	if (request.method == "POST" || request.method == "PUT")
 		request.body = httpData.body;
-	request.exception = client.exception;
+
+
 
 	HttpResponse response = RequestProcessor::process(request, _configs);
 

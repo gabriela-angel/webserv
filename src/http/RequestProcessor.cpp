@@ -28,50 +28,55 @@
 
 #include "./http/RequestProcessor.hpp"
 
-HttpResponse RequestProcessor::process(const HttpStruct& request, ManagerConfig& config) {
+HttpResponse RequestProcessor::process(const HttpStruct& request, const ManagerConfig& config) {
 	HttpResponse response;
-	ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
-	LocationConfig* location = matchLocation(request.getUri(), server);
-
-	if (!location) {
-		response.setStatus(HttpStatus::NOT_FOUND);
-		handlePageErrors(response, server, location);
-		return response;
-	}
-	if (location->hasRedirect()) {
-		int code = location->getRedirectCode();
-		response.setStatus(static_cast<HttpStatus::Code>(code));
-		if (code >= 300 && code < 400) {
-			response.addHeader("Location", location->getRedirectUrl());
-		} else if (!location->getRedirectUrl().empty()) {
-			// 2xx/4xx/5xx: second argument is a response body
-			response.setBody(location->getRedirectUrl());
-			response.addHeader("Content-Type", "text/plain");
-			response.addHeader("Content-Length", itoa(static_cast<int>(location->getRedirectUrl().size())));
-		}
-		handlePageErrors(response, server, location);
-		return response;
-	}
-	if (!isMethodAllowed(request.getMethod(), *location)) {
-		response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
-		handlePageErrors(response, server, location);
-		return response;
-	}
+	try {
+		const ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
+		const LocationConfig* location = matchLocation(request.getUri(), server);
 	
-	if (request.getMethod() == "GET")
-		handleGet(request, response, server, location);
-	else if (request.getMethod() == "POST")
-		handlePost(request, response, server, location);
-	else
-		handleDelete(request, response, server, location);
+		if (!location) {
+			response.setStatus(HttpStatus::NOT_FOUND);
+			handlePageErrors(response, server, location);
+			return response;
+		}
+		if (location->hasRedirect()) {
+			int code = location->getRedirectCode();
+			response.setStatus(static_cast<HttpStatus::Code>(code));
+			if (code >= 300 && code < 400) {
+				response.addHeader("Location", location->getRedirectUrl());
+			} else if (!location->getRedirectUrl().empty()) {
+				// 2xx/4xx/5xx: second argument is a response body
+				response.setBody(location->getRedirectUrl());
+				response.addHeader("Content-Type", "text/plain");
+				response.addHeader("Content-Length", itoa(static_cast<int>(location->getRedirectUrl().size())));
+			}
+			handlePageErrors(response, server, location);
+			return response;
+		}
+		if (!isMethodAllowed(request.getMethod(), *location)) {
+			response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
+			handlePageErrors(response, server, location);
+			return response;
+		}
+		
+		if (request.getMethod() == "GET")
+			handleGet(request, response, server, location);
+		else if (request.getMethod() == "POST")
+			handlePost(request, response, server, location);
+		else
+			handleDelete(request, response, server, location);
 
-	handlePageErrors(response, server, location);
-	return response;
+		handlePageErrors(response, server, location);
+		return response;
+	} catch (const HttpException& e) {
+		response.setStatus(e.getStatusCode());
+		return response;
+	}
 }
 
 // METHOD RELATED ---------------------------------------------------------------------------------
 
-void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
 
 	if (isValidDirectory(filepath)) {
@@ -114,14 +119,10 @@ void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& respon
 }
 
 
-void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
 	size_t max_body_size = location->hasMaxBodySize()
 		? location->getClientMaxBodySize()
 		: server.getClientMaxBodySize();
-	if (request.getBody().size() > max_body_size) {
-		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
-		return;
-	}
 
 	std::string filepath = resolveFilePath(server, location, request.getUri());
 
@@ -176,7 +177,7 @@ void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& respo
 	response.addHeader("Content-Type", "text/plain");
 }
  
-void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
  
 	if (!isValidFile(filepath) && !isValidDirectory(filepath)) {
@@ -218,7 +219,7 @@ void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& res
 
 
 // File serving ---------------------------------------------------------------------------------
-void RequestProcessor::serveFile(HttpResponse& response, const std::string& path, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::serveFile(HttpResponse& response, const std::string& path, const ServerConfig& server, const LocationConfig* location) {
 	if (access(path.c_str(), R_OK) != 0) {
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return ;
@@ -229,16 +230,7 @@ void RequestProcessor::serveFile(HttpResponse& response, const std::string& path
 		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
 		return ;
 	}
-	size_t file_size = static_cast<size_t>(info.st_size);
-	size_t max_body_size;
-	if (location->hasMaxBodySize())
-		max_body_size = location->getClientMaxBodySize();
-	else
-		max_body_size = server.getClientMaxBodySize();
-	if (file_size > max_body_size) {
-		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
-		return ;
-	}
+	
 	
 	std::ifstream file(path.c_str(), std::ios::binary);
 	if (!file.is_open()) {
@@ -246,6 +238,7 @@ void RequestProcessor::serveFile(HttpResponse& response, const std::string& path
 		return;
 	}
 
+	size_t file_size = static_cast<size_t>(info.st_size);
 	std::string body(file_size, '\0');
 	file.read(&body[0], static_cast<std::streamsize>(file_size));
 	if (!file && !file.eof()) {
@@ -353,7 +346,7 @@ bool RequestProcessor::writeToFile(const std::string& dest, const std::string& b
 
 // Resolves the destination path for a POST and sets file_existed.
 // Returns an empty string and sets the response status on error.
-std::string RequestProcessor::resolvePostDest(const HttpStruct& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed) {
+std::string RequestProcessor::resolvePostDest(const HttpStruct& request, HttpResponse& response, const LocationConfig* location, const std::string& filepath, bool& file_existed) {
 	if (isValidDirectory(filepath)) {
 		std::string upload_dir = location->getUpload();
 		if (upload_dir.empty() || !isValidDirectory(upload_dir) || access(upload_dir.c_str(), W_OK) != 0) {
@@ -400,7 +393,7 @@ std::string RequestProcessor::resolvePostDest(const HttpStruct& request, HttpRes
  
 
 // Handles multipart/form-data uploads: parses each part and saves files to upload_dir
-bool RequestProcessor::handleMultipart(const HttpStruct& request, HttpResponse& response, LocationConfig* location) {
+bool RequestProcessor::handleMultipart(const HttpStruct& request, HttpResponse& response, const LocationConfig* location) {
 	const Headers& headers = request.getHeaders();
  
 	std::string upload_dir = location->getUpload();
@@ -504,9 +497,9 @@ bool RequestProcessor::canDelete(const std::string& path) {
 // Routing helpers ---------------------------------------------------------------------------------
 
 
-LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
+const LocationConfig* RequestProcessor::matchLocation(std::string request_uri, const ServerConfig& server) {
 	unsigned long match_length = 0;
-	LocationConfig* best_match = NULL;
+	const LocationConfig* best_match = NULL;
 
 	// Strip query string before prefix matching
 	size_t q = request_uri.find('?');
@@ -543,7 +536,7 @@ bool RequestProcessor::isMethodAllowed(const std::string& method, const Location
 }
 
 
-std::string RequestProcessor::resolveFilePath(ServerConfig& server, LocationConfig* location, std::string uri) {
+std::string RequestProcessor::resolveFilePath(const ServerConfig& server, const LocationConfig* location, std::string uri) {
 	std::string filepath;
 
 	// Strip query string — it's for CGI env, not the filesystem path
@@ -567,7 +560,7 @@ std::string RequestProcessor::resolveFilePath(ServerConfig& server, LocationConf
 	return filepath;
 }
 
-void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handlePageErrors(HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
 	const int &status = response.getStatus();
 	
 	typedef std::map<int, std::string>	ErrorPage;

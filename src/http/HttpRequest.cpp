@@ -1,4 +1,5 @@
 #include "HttpRequest.hpp"
+#include "RequestProcessor.hpp"
 
 HttpRequest::HttpRequest() {}
 HttpRequest::~HttpRequest() {}
@@ -41,7 +42,6 @@ inline static void fillClientData(ClientData &client) {
 		stateMachine.state = StateMachine::DONE;
 	}
 }
-
 
 /* ---------------------------- Main Functions to Process Client ---------------------------- */
 
@@ -93,6 +93,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 				if (!part.isComplete) return true;
 				_validateRequestLine(stateMachine.httpData.requestLine);
 				_validateHeaders(part.value);
+				_validateMaxBodySize(part.value, _config, stateMachine.httpData.requestLine.uri);
 				stateMachine.httpData.headers = part.value;
 				fillClientData(client);
 				
@@ -327,9 +328,9 @@ void HttpRequest::_validateHeaders(const Headers &headers)
 			if (!std::isdigit(static_cast<unsigned char>(mainValue[i])))
 				throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
 		
-		// Convert to long long and check range
-		long long contentLength = from_string<long long>(mainValue);
-		if (contentLength < 0 || contentLength > MAX_BODY_SIZE)
+		// Convert to size_t and check range
+		size_t contentLength = from_string<size_t>(mainValue);
+		if (contentLength < 0)
 			throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
 
 		// If Content-Length AND Transfer-Encoding is present, it's an error
@@ -460,6 +461,37 @@ void HttpRequest::_validateHeaders(const Headers &headers)
 		throw HttpException(HttpException::ParseError::MISSING_HOST_HEADER);
 }
 
+inline static size_t getBodyMaxSize(const Headers &headers, const ManagerConfig &config, const std::string &uri)
+{
+    std::string host = headers.at(HOST)[0];
+    int port = 80;
+
+    size_t colon_pos = host.find(':');
+    if (colon_pos != std::string::npos)
+    {
+        std::string port_str = host.substr(colon_pos + 1);
+        host = host.substr(0, colon_pos);
+        port = from_string<int>(port_str);
+    }
+
+    const ServerConfig& server = config.findServer(port, host);
+    const LocationConfig* location = RequestProcessor::matchLocation(uri, server);
+
+    if (location && location->hasMaxBodySize())
+        return location->getClientMaxBodySize();
+    return server.getClientMaxBodySize();
+}
+void HttpRequest::_validateMaxBodySize(const Headers &headers, const ManagerConfig &config, const std::string &uri)
+{
+	if (headers.hasKey(CONTENT_LENGTH)) {
+		size_t maxBodySize = getBodyMaxSize(headers, config, uri);
+	
+		size_t contentLength = from_string<size_t>(headers.find(CONTENT_LENGTH)->second[0]);
+		if (contentLength > maxBodySize)
+			throw HttpException(HttpException::ParseError::PAYLOAD_TOO_LARGE);
+	}
+}
+
 HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 {
 	const std::string	&buffer = stateMachine.buffer;
@@ -479,13 +511,9 @@ HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 	}
 
 /* TRANSFER-ENCODING: chunked */
-	if (httpData.chunkedTransferEncoding) {
-		if (buffer.size() > MAX_BODY_SIZE)
-			throw HttpException(HttpException::ParseError::PAYLOAD_TOO_LARGE);
-		
-		// Implement a ChunkStateMachine to parse the chunked body
-		// update client Activity
-	}
+	// Implement a ChunkStateMachine to parse the chunked body
+	// Validate Body Length while receiving chunks
+	// update client Activity
 
 	HttpPart<std::string> part;
 	part.isComplete = true;

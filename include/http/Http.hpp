@@ -16,6 +16,15 @@
 
 #define HTTP_METHODS {"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"}
 
+#define MAX_URI_SIZE			16384				// 16 KB
+#define MAX_REQUEST_LINE_SIZE	(MAX_URI_SIZE + 20)	// Method + Version + Spaces
+#define MAX_HEADER_SIZE			16384				// 16 KB
+#define MAX_HEADERS				100					// Maximum number of headers allowed in a request
+#define MAX_BODY_SIZE			10485760			// 10 MB
+#define MAX_CHUNK_SIZE			1048576				// 1 MB
+#define MAX_HOST_LABEL_SIZE		63					// Maximum size of a single label in the Host header
+#define MAX_HOST_SIZE			255					// Maximum size of the entire Host header value
+
 class	Http {
 	public:
 		virtual ~Http() {}
@@ -114,6 +123,7 @@ struct	ClientData
 	int clientSocket;
 	int	serverSocket;
 	struct sockaddr_in client_addr;
+	size_t maxBodySize;
 
 	// Session ID (if any)
 	std::string sessionId;
@@ -125,11 +135,12 @@ struct	ClientData
 	HttpException exception;
 	
 	// Constructors
-	ClientData(const struct sockaddr_in &addr, int clientSocket, int serverSocket)
+	ClientData(const struct sockaddr_in &addr, int clientSocket, int serverSocket, size_t maxBodySize = MAX_BODY_SIZE)
 	: 
 		clientSocket(clientSocket),
 		serverSocket(serverSocket),
 		client_addr(addr),
+		maxBodySize(maxBodySize),
 		sessionId(""),
 		stateMachine(StateMachine()),
 		exception()
@@ -140,6 +151,7 @@ struct	ClientData
 		clientSocket(-1),
 		serverSocket(-1),
 		client_addr(),
+		maxBodySize(MAX_BODY_SIZE),
 		sessionId(""),
 		stateMachine(),
 		exception()

@@ -1,4 +1,5 @@
-#include "./config/ManagerConfig.hpp"
+#include "ManagerConfig.hpp"
+#include "HttpException.hpp"
 
 ManagerConfig::ManagerConfig(const std::vector<ServerConfig>& servers) : _servers(servers) {
 	if (_servers.empty())
@@ -16,7 +17,7 @@ ManagerConfig& ManagerConfig::operator=(const ManagerConfig& other){
 
 ManagerConfig::~ManagerConfig() {}
 
-ServerConfig& ManagerConfig::findServer(int port, const std::string& host_header) {
+const ServerConfig& ManagerConfig::findServer(int port, const std::string& host_header) const {
 	int default_server = -1;
 	for (size_t i = 0; i < _servers.size(); i++) {
 		if (_servers[i].listensOnPort(port)) {
@@ -29,7 +30,7 @@ ServerConfig& ManagerConfig::findServer(int port, const std::string& host_header
 	}
 	if (default_server != -1)
 		return _servers[default_server];
-	throw std::runtime_error("No server listening on this port");
+	throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
 }
 
 //debug

@@ -21,8 +21,6 @@ struct HttpStruct {
 	std::string host;
 	Headers		headers;
 	std::string body;
-	
-	HttpException exception;
 
 	int port;
 
@@ -38,28 +36,27 @@ struct HttpStruct {
 };
 
 class RequestProcessor {
-private:
-	static void			handlePageErrors(HttpResponse& response, ServerConfig& server, LocationConfig* location);
-	static LocationConfig* matchLocation(std::string request_uri, ServerConfig& server);
-	static bool			isMethodAllowed(const std::string& method, const LocationConfig& location);
-	static std::string		resolveFilePath(ServerConfig& server, LocationConfig* location, std::string uri);
+	private:
+		static void			handlePageErrors(HttpResponse& response, const ServerConfig& server, const LocationConfig* location);
+		static bool			isMethodAllowed(const std::string& method, const LocationConfig& location);
+		static std::string	resolveFilePath(const ServerConfig& server, const LocationConfig* location, std::string uri);
 
-	static void			handleGet(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
-	static void			handlePost(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
-	static void			handleDelete(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location);
+		static void			handleGet(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location);
+		static void			handlePost(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location);
+		static void			handleDelete(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location);
 
-	static std::string		extractHeaderAttribute(const std::string& header, const std::string& key);
-	static std::string		extractFilename(const std::string& disposition);
-	static bool			writeToFile(const std::string& dest, const std::string& body);
-	static std::string 	resolvePostDest(const HttpStruct& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed);
-	static bool			handleMultipart(const HttpStruct& request, HttpResponse& response, LocationConfig* location);
-	static bool			canDelete(const std::string& path);
-	static void			serveFile(HttpResponse& response, const std::string& path, ServerConfig& server, LocationConfig* location);
-	static void			generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri);
-	
-public:
-	static HttpResponse	process(const HttpStruct& request, ManagerConfig& config);
-
+		static std::string	extractHeaderAttribute(const std::string& header, const std::string& key);
+		static std::string	extractFilename(const std::string& disposition);
+		static bool			writeToFile(const std::string& dest, const std::string& body);
+		static std::string 	resolvePostDest(const HttpStruct& request, HttpResponse& response, const LocationConfig* location, const std::string& filepath, bool& file_existed);
+		static bool			handleMultipart(const HttpStruct& request, HttpResponse& response, const LocationConfig* location);
+		static bool			canDelete(const std::string& path);
+		static void			serveFile(HttpResponse& response, const std::string& path, const ServerConfig& server, const LocationConfig* location);
+		static void			generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri);
+		
+	public:
+		static HttpResponse	process(const HttpStruct& request, const ManagerConfig& config);
+		static const LocationConfig* matchLocation(std::string request_uri, const ServerConfig& server);
 };
 
 #endif

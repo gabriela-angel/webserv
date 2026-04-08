@@ -25,4 +25,4 @@ se nao existir diretiva     index index.html; pegar index.html automaticamente
 
 CONTENT_TOO_LARGE esta sendo validado na response sendo que acho que e so pra request
 
-na pagina http://127.0.0.1:8084/silent css ta sendo requisitado 2 vezes (sla pq)
+findServer esta parando o servidor ao nao dar match
