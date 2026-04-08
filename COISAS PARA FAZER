@@ -17,8 +17,6 @@ error_page nao ta funcionando
 
 (RequestProcessor.cpp:86) pensar em colocar 404 Not Found
 
-CGI so executa se for GET?
-
 verificar se compensa enviar send aos poucos e ver como isso se relaciona com a velocidade da internet 
 
 rodar ./test antes da avaliacao
@@ -26,3 +24,5 @@ rodar ./test antes da avaliacao
 se nao existir diretiva     index index.html; pegar index.html automaticamente
 
 CONTENT_TOO_LARGE esta sendo validado na response sendo que acho que e so pra request
+
+na pagina http://127.0.0.1:8084/silent css ta sendo requisitado 2 vezes (sla pq)

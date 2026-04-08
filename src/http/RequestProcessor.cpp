@@ -579,6 +579,7 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& se
 		if (it->first == status) {
 			std::string path = resolveFilePath(server, location, it->second);
 			serveFile(response, path, server, location);
+			response.setStatus(HttpStatus::Code(status));
 			return;
 		}
 	}
@@ -591,6 +592,7 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& se
 				path = "/" + path;
 			path = server.getRoot() + path;
 			serveFile(response, path, server, location);
+			response.setStatus(HttpStatus::Code(status));
 			return;
 		}
 	}

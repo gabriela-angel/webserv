@@ -1,1 +1,2 @@
 Marvin,marvin.jpg
+Shiro,petit.png
