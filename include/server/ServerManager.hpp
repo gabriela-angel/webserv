@@ -35,21 +35,28 @@ struct Session
 	Session() : sessionId(""), createdAt(std::time(NULL)), lastActivity(std::time(NULL)) {}
 };
 
+struct ConfigMap {
+	Socket::Config config;
+	std::vector<ServerConfig> servers;
+};
+
 class ServerManager
 {
   private:
 	ServerManager();
 
   public:
-	typedef std::map<std::string, Session>				Sessions;		// <sessionId, Session*>
+  	typedef std::vector<ServerConfig>					Servers;
+  	typedef std::map<std::string, Session>				Sessions;		// <sessionId, Session*>
 	typedef std::map<std::string, Session>::iterator	SessionIterator;
 	typedef std::map<int, ClientData>::iterator			ClientIterator;
-
-  private:	
+  
+	private:
 	Logger&						_logger;
 	EpollManager&				_epoll;
 	ManagerConfig				_configs;
 	std::vector<Socket *>		_sockets;
+	std::map<int, Servers> 		_serversMap;
 	std::map<int, ClientData>	_clientMap;		// <clientSocket, ClientData>
 	Sessions					_sessions;		// <sessionId, SessionData>
 	int							_urandom_fd;	// File descriptor for /dev/urandom to get true random numbers
@@ -58,19 +65,20 @@ class ServerManager
 	ServerManager(const char *configFilePath);
 	~ServerManager();
 
-	void	acceptConnection(int serverSocket);
-	void	handleRead(int clientSocket);
-	void	handleWrite(int clientSocket);
-	void	removeClient(int clientSocket);
-	void	removeSession(const std::string &sessionId);
-	bool	isServerSocket(int sockfd) const;
-	int		getEpollFD() const;
+	const ServerConfig&	findServer(int serverSocket, const std::string &host_header) const;
+	void				acceptConnection(int serverSocket);
+	void				handleRead(int clientSocket);
+	void				handleWrite(int clientSocket);
+	void				removeClient(int clientSocket);
+	void				removeSession(const std::string &sessionId);
+	bool				isServerSocket(int sockfd) const;
+	int					getEpollFD() const;
 
 	// Getters
 	const std::map<int, ClientData> &getClientMap() const { return _clientMap; }
-	const Sessions &getSessions() const { return _sessions; }
+	const Sessions					&getSessions() const { return _sessions; }
 
   private:
-	std::string generateSecureSessionId();
-	void _handleSession(ClientData &client);
+	std::string						_generateSecureSessionId();
+	void							_handleSession(ClientData &client);
 };

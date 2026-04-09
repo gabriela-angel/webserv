@@ -74,8 +74,8 @@ char** CgiHandler::buildEnv(
 	env_vec.push_back("REQUEST_METHOD=" + request.getMethod());
 	env_vec.push_back("SCRIPT_FILENAME=" + filepath);
 	env_vec.push_back("SCRIPT_NAME=" + request.getUri());
-	env_vec.push_back("SERVER_PORT=" + intStr(request.getPort()));
-	env_vec.push_back("SERVER_NAME=" + request.getHostHeader());
+	env_vec.push_back("SERVER_PORT=" + to_string(request.getPort()));
+	env_vec.push_back("SERVER_NAME=" + request.getIP());
 
 	// Query string (part of URI after '?')
 	std::string uri = request.getUri();

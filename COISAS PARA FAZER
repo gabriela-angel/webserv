@@ -1,28 +1,11 @@
-ENVIAR PAGINA PADRAO 404 AO NAO ACHAR SERVIDOR CORRESPONDENTE
-
 BUG AO REMOVER UM PONTO E VIRGULA DE ALGUMA LINHA DO CONFIG
 
-verificar corretamente request.exception na resposta
-
-default_server nao parece estar funcionando (junto com o match das locations)
+verificar se default_server esta funcionando
 
 VERIFICAR LEAKS
 
 IMPLEMENTAR LOGIN
 
-MAIOR PARTE DOS ERROS TEM Q TER Connection: close E FECHAR O SOCKET
-
-error_page nao ta funcionando
-    Varificar se "error_page 200 /errors/403.html;" funciona (precisa funcionar)
-
-(RequestProcessor.cpp:86) pensar em colocar 404 Not Found
-
 verificar se compensa enviar send aos poucos e ver como isso se relaciona com a velocidade da internet 
 
 rodar ./test antes da avaliacao
-
-se nao existir diretiva     index index.html; pegar index.html automaticamente
-
-CONTENT_TOO_LARGE esta sendo validado na response sendo que acho que e so pra request
-
-findServer esta parando o servidor ao nao dar match

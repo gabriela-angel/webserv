@@ -17,22 +17,6 @@ ManagerConfig& ManagerConfig::operator=(const ManagerConfig& other){
 
 ManagerConfig::~ManagerConfig() {}
 
-const ServerConfig& ManagerConfig::findServer(int port, const std::string& host_header) const {
-	int default_server = -1;
-	for (size_t i = 0; i < _servers.size(); i++) {
-		if (_servers[i].listensOnPort(port)) {
-			const std::vector<std::string>& server_names = _servers[i].getServerName();
-			if (std::find(server_names.begin(), server_names.end(), host_header) != server_names.end())
-				return _servers[i];
-			if (default_server == -1 || _servers[i].isDefaultServer())
-				default_server = i;
-		}
-	}
-	if (default_server != -1)
-		return _servers[default_server];
-	throw HttpException(HttpException::ParseError::MALFORMED_HEADER);
-}
-
 //debug
 std::ostream& operator<<(std::ostream& os, const ManagerConfig& config) {
 	const std::vector<ServerConfig>& servers = config.getServers();

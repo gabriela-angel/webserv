@@ -22,8 +22,9 @@ struct HttpStruct {
 	Headers		headers;
 	std::string body;
 
+	int serverSocket;
+	std::string ip;
 	int port;
-
 	// Getters
 	const std::string& getMethod() const { return method; }
 	const std::string& getHTTPVersion() const { return HTTPVersion; }
@@ -31,8 +32,9 @@ struct HttpStruct {
 	const std::string& getHostHeader() const { return host; }
 	const Headers& getHeaders() const { return headers; }
 	const std::string& getBody() const { return body; }
+	const int& getServerSocket() const { return serverSocket; }
+	const std::string& getIP() const { return ip; }
 	const int& getPort() const { return port; }
-
 };
 
 class RequestProcessor {
@@ -51,11 +53,18 @@ class RequestProcessor {
 		static std::string 	resolvePostDest(const HttpStruct& request, HttpResponse& response, const LocationConfig* location, const std::string& filepath, bool& file_existed);
 		static bool			handleMultipart(const HttpStruct& request, HttpResponse& response, const LocationConfig* location);
 		static bool			canDelete(const std::string& path);
-		static void			serveFile(HttpResponse& response, const std::string& path, const ServerConfig& server, const LocationConfig* location);
+		static void			serveFile(HttpResponse& response, const std::string& path);
 		static void			generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri);
 		
+		struct AutoindexEntry {
+			std::string name;
+			bool is_dir;
+			std::string line;
+		};
+		static bool			compareAutoindexEntry(const AutoindexEntry& a, const AutoindexEntry& b);
+
 	public:
-		static HttpResponse	process(const HttpStruct& request, const ManagerConfig& config);
+		static HttpResponse	process(const HttpStruct& request, const ServerManager& config);
 		static const LocationConfig* matchLocation(std::string request_uri, const ServerConfig& server);
 };
 

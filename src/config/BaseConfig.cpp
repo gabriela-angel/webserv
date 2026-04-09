@@ -1,4 +1,4 @@
-#include "./config/BaseConfig.hpp"
+#include "BaseConfig.hpp"
 #include "Http.hpp"
 
 BaseConfig::BaseConfig() {

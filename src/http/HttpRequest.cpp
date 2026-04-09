@@ -45,11 +45,11 @@ inline static void fillClientData(ClientData &client) {
 
 /* ---------------------------- Main Functions to Process Client ---------------------------- */
 
-void HttpRequest::processClient(ClientData &client) {
+void HttpRequest::processClient(ClientData &client, const ServerManager &manager) {
     StateMachine &sm = client.stateMachine;
 
     while (sm.state != StateMachine::DONE && sm.state != StateMachine::ERROR) {
-        if (_processClientState(client))
+        if (_processClientState(client, manager))
 		{
 			_logger.logDebug("Client " + to_string(client.clientSocket) + " - Waiting for more data...");
 			break; // if need more data
@@ -62,7 +62,7 @@ void HttpRequest::processClient(ClientData &client) {
 }
 
 // This function will return true if we need to wait for more data
-bool HttpRequest::_processClientState(ClientData &client) {
+bool HttpRequest::_processClientState(ClientData &client, const ServerManager &manager) {
 	StateMachine &stateMachine = client.stateMachine;
 	std::string &buffer = stateMachine.buffer;
 
@@ -93,7 +93,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 				if (!part.isComplete) return true;
 				_validateRequestLine(stateMachine.httpData.requestLine);
 				_validateHeaders(part.value);
-				_validateMaxBodySize(part.value, _config, stateMachine.httpData.requestLine.uri);
+				_validateMaxBodySize(manager, client, part.value);
 				stateMachine.httpData.headers = part.value;
 				fillClientData(client);
 				
@@ -327,11 +327,6 @@ void HttpRequest::_validateHeaders(const Headers &headers)
 		for (size_t i = 0; i < mainValue.size(); ++i)
 			if (!std::isdigit(static_cast<unsigned char>(mainValue[i])))
 				throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
-		
-		// Convert to size_t and check range
-		size_t contentLength = from_string<size_t>(mainValue);
-		if (contentLength < 0)
-			throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
 
 		// If Content-Length AND Transfer-Encoding is present, it's an error
 		if (hasTransferEncoding)
@@ -461,30 +456,29 @@ void HttpRequest::_validateHeaders(const Headers &headers)
 		throw HttpException(HttpException::ParseError::MISSING_HOST_HEADER);
 }
 
-inline static size_t getBodyMaxSize(const Headers &headers, const ManagerConfig &config, const std::string &uri)
+inline static size_t getBodyMaxSize(const ServerManager &manager, const ClientData &client, const Headers &headers)
 {
-    std::string host = headers.at(HOST)[0];
-    int port = 80;
+	std::string host = headers.find(HOST)->second[0];
+	const std::string &uri = client.stateMachine.httpData.requestLine.uri;
+	int serverSocket = client.serverSocket;
 
     size_t colon_pos = host.find(':');
     if (colon_pos != std::string::npos)
-    {
-        std::string port_str = host.substr(colon_pos + 1);
         host = host.substr(0, colon_pos);
-        port = from_string<int>(port_str);
-    }
+    
 
-    const ServerConfig& server = config.findServer(port, host);
+    const ServerConfig& server = manager.findServer(serverSocket, host);
     const LocationConfig* location = RequestProcessor::matchLocation(uri, server);
 
     if (location && location->hasMaxBodySize())
         return location->getClientMaxBodySize();
     return server.getClientMaxBodySize();
 }
-void HttpRequest::_validateMaxBodySize(const Headers &headers, const ManagerConfig &config, const std::string &uri)
+
+void HttpRequest::_validateMaxBodySize(const ServerManager &manager, const ClientData &client, const Headers &headers)
 {
 	if (headers.hasKey(CONTENT_LENGTH)) {
-		size_t maxBodySize = getBodyMaxSize(headers, config, uri);
+		size_t maxBodySize = getBodyMaxSize(manager, client, headers);
 	
 		size_t contentLength = from_string<size_t>(headers.find(CONTENT_LENGTH)->second[0]);
 		if (contentLength > maxBodySize)

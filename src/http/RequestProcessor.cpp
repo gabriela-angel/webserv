@@ -28,50 +28,45 @@
 
 #include "./http/RequestProcessor.hpp"
 
-HttpResponse RequestProcessor::process(const HttpStruct& request, const ManagerConfig& config) {
+HttpResponse RequestProcessor::process(const HttpStruct& request, const ServerManager& manager) {
 	HttpResponse response;
-	try {
-		const ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
-		const LocationConfig* location = matchLocation(request.getUri(), server);
-	
-		if (!location) {
-			response.setStatus(HttpStatus::NOT_FOUND);
-			handlePageErrors(response, server, location);
-			return response;
-		}
-		if (location->hasRedirect()) {
-			int code = location->getRedirectCode();
-			response.setStatus(static_cast<HttpStatus::Code>(code));
-			if (code >= 300 && code < 400) {
-				response.addHeader("Location", location->getRedirectUrl());
-			} else if (!location->getRedirectUrl().empty()) {
-				// 2xx/4xx/5xx: second argument is a response body
-				response.setBody(location->getRedirectUrl());
-				response.addHeader("Content-Type", "text/plain");
-				response.addHeader("Content-Length", itoa(static_cast<int>(location->getRedirectUrl().size())));
-			}
-			handlePageErrors(response, server, location);
-			return response;
-		}
-		if (!isMethodAllowed(request.getMethod(), *location)) {
-			response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
-			handlePageErrors(response, server, location);
-			return response;
-		}
-		
-		if (request.getMethod() == "GET")
-			handleGet(request, response, server, location);
-		else if (request.getMethod() == "POST")
-			handlePost(request, response, server, location);
-		else
-			handleDelete(request, response, server, location);
+	const ServerConfig& server = manager.findServer(request.getServerSocket(), request.getHostHeader());
+	const LocationConfig* location = matchLocation(request.getUri(), server);
 
+	if (!location) {
+		response.setStatus(HttpStatus::NOT_FOUND);
 		handlePageErrors(response, server, location);
 		return response;
-	} catch (const HttpException& e) {
-		response.setStatus(e.getStatusCode());
+	}
+	if (location->hasRedirect()) {
+		int code = location->getRedirectCode();
+		response.setStatus(static_cast<HttpStatus::Code>(code));
+		if (code >= 300 && code < 400) {
+			response.addHeader("Location", location->getRedirectUrl());
+		} else if (!location->getRedirectUrl().empty()) {
+			// 2xx/4xx/5xx: second argument is a response body
+			response.setBody(location->getRedirectUrl());
+			response.addHeader("Content-Type", "text/plain");
+			response.addHeader("Content-Length", itoa(static_cast<int>(location->getRedirectUrl().size())));
+		}
+		handlePageErrors(response, server, location);
 		return response;
 	}
+	if (!isMethodAllowed(request.getMethod(), *location)) {
+		response.setStatus(HttpStatus::METHOD_NOT_ALLOWED);
+		handlePageErrors(response, server, location);
+		return response;
+	}
+	
+	if (request.getMethod() == "GET")
+		handleGet(request, response, server, location);
+	else if (request.getMethod() == "POST")
+		handlePost(request, response, server, location);
+	else
+		handleDelete(request, response, server, location);
+
+	handlePageErrors(response, server, location);
+	return response;
 }
 
 // METHOD RELATED ---------------------------------------------------------------------------------
@@ -95,15 +90,22 @@ void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& respon
 				if (isValidFile(index_path)) {
 					if (CgiHandler::tryRun(request, response, *location, index_path))
 						return;
-					serveFile(response, index_path, server, location);
+					serveFile(response, index_path);
 					return ;
 				}
 			}
 		}
-		if (location->hasAutoindex() && location->getAutoindex()) {
+		if ((location->hasAutoindex() && location->getAutoindex()) || (server.hasAutoindex() && server.getAutoindex())) {
 			generateAutoindex(response, filepath, request.getUri());
 			return ;
 		}
+
+		// Try find index.html
+		if (isValidFile(filepath + "index.html")) {
+			serveFile(response, filepath + "index.html");
+			return ;
+		}
+
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return ;
 	}
@@ -115,14 +117,11 @@ void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& respon
 
 	if (CgiHandler::tryRun(request, response, *location, filepath))
 		return;
-	serveFile(response, filepath, server, location);
+	serveFile(response, filepath);
 }
 
 
 void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
-	size_t max_body_size = location->hasMaxBodySize()
-		? location->getClientMaxBodySize()
-		: server.getClientMaxBodySize();
 
 	std::string filepath = resolveFilePath(server, location, request.getUri());
 
@@ -219,7 +218,7 @@ void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& res
 
 
 // File serving ---------------------------------------------------------------------------------
-void RequestProcessor::serveFile(HttpResponse& response, const std::string& path, const ServerConfig& server, const LocationConfig* location) {
+void RequestProcessor::serveFile(HttpResponse& response, const std::string& path) {
 	if (access(path.c_str(), R_OK) != 0) {
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return ;
@@ -254,50 +253,72 @@ void RequestProcessor::serveFile(HttpResponse& response, const std::string& path
 
 
 // Autoindex ---------------------------------------------------------------------------------
+bool RequestProcessor::compareAutoindexEntry(const AutoindexEntry& a, const AutoindexEntry& b) {
+	if (a.is_dir != b.is_dir)
+		return a.is_dir > b.is_dir;
+	return a.name < b.name;
+}
+
 void RequestProcessor::generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri) {
 	DIR* dir = opendir(dirpath.c_str());
 	if (!dir) {
 		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
 		return;
 	}
- 
+
 	std::ostringstream html;
 	html << "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\">"
 	     << "<title>Index of " << uri << "</title></head>\n"
 	     << "<body>\n<h1>Index of " << uri << "</h1>\n<hr>\n<pre>\n";
- 
+
+	std::vector<AutoindexEntry> entries;
 	struct dirent* entry;
 	while ((entry = readdir(dir)) != NULL) {
 		std::string name = entry->d_name;
 		if (name == ".")
 			continue;
- 
+
 		std::string fullpath = dirpath + name;
 		struct stat info;
 		std::string display = name;
 		std::string size_str = "-";
- 
+		bool is_dir = false;
+
 		if (stat(fullpath.c_str(), &info) == 0) {
-			if (S_ISDIR(info.st_mode))
+			if (S_ISDIR(info.st_mode)) {
+				is_dir = true;
 				display += "/";
-			else
+			} else {
 				size_str = itoa(static_cast<int>(info.st_size));
+			}
 		}
- 
+
 		std::string href = uri;
-		if (href[href.size() - 1] != '/')
+		if (!href.empty() && href[href.size() - 1] != '/')
 			href += '/';
 		href += name;
-		if (S_ISDIR(info.st_mode))
+		if (is_dir)
 			href += '/';
- 
-		html << "<a href=\"" << href << "\">" << display << "</a>"
-		     << "\t\t" << size_str << "\n";
+
+		std::ostringstream line;
+		line << "<a href=\"" << href << "\">" << display << "</a>"
+		     << "\t\t" << size_str;
+
+		AutoindexEntry item;
+		item.name = name;
+		item.is_dir = is_dir;
+		item.line = line.str();
+		entries.push_back(item);
 	}
 	closedir(dir);
- 
+
+	std::sort(entries.begin(), entries.end(), compareAutoindexEntry);
+
+	for (size_t i = 0; i < entries.size(); ++i)
+		html << entries[i].line << "\n";
+
 	html << "</pre>\n<hr>\n</body>\n</html>\n";
- 
+
 	std::string body = html.str();
 	response.setStatus(HttpStatus::OK);
 	response.setBody(body);
@@ -527,6 +548,7 @@ const LocationConfig* RequestProcessor::matchLocation(std::string request_uri, c
 
 bool RequestProcessor::isMethodAllowed(const std::string& method, const LocationConfig& location) {
 	const std::vector<std::string>& allowed_methods = location.getMethods();
+	const std::string test = allowed_methods[0];
 	for (size_t i = 0; i < allowed_methods.size(); i++) {
 		//verificar se Luiz ja ta me enviando tudo em uppercase
 		if (allowed_methods[i] == method)
@@ -571,8 +593,10 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, const ServerConf
 	for (ErrorPageIt it = location_pages.begin(); it != location_pages.end(); ++it) {
 		if (it->first == status) {
 			std::string path = resolveFilePath(server, location, it->second);
-			serveFile(response, path, server, location);
-			response.setStatus(HttpStatus::Code(status));
+			HttpResponse newResponse;
+			serveFile(newResponse, path);
+			newResponse.setStatus(HttpStatus::Code(status));
+			response = newResponse;
 			return;
 		}
 	}
@@ -584,8 +608,10 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, const ServerConf
 			if (path[0] != '/')
 				path = "/" + path;
 			path = server.getRoot() + path;
-			serveFile(response, path, server, location);
-			response.setStatus(HttpStatus::Code(status));
+			HttpResponse newResponse;
+			serveFile(newResponse, path);
+			newResponse.setStatus(HttpStatus::Code(status));
+			response = newResponse;
 			return;
 		}
 	}

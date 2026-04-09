@@ -10,11 +10,10 @@ class HttpRequest : public Http {
 
 	private:
 		static Logger&					_logger;
-		static const ManagerConfig&		_config;
 		HttpRequest();
 
 		/* Client State Machine Processing */
-		static bool						_processClientState(ClientData &client);
+		static bool						_processClientState(ClientData &client, const ServerManager &manager);
 		
 		/* Parsing and Validation */
 		static void						_parseCookies(ClientData &client);
@@ -24,12 +23,13 @@ class HttpRequest : public Http {
 
 		static HttpPart<Headers>		_parseHeaders(const std::string &buffer);
 		static void						_validateHeaders(const Headers &headers);
-		static void						_validateMaxBodySize(const Headers &headers, const ManagerConfig &config, const std::string &uri);
+		static void						_validateMaxBodySize(const ServerManager &manager, const ClientData &client, const Headers &headers);
+
 		// This function parses the body and validates it according to the headers (Content-Length, Transfer-Encoding, etc.)
 		static HttpPart<std::string>	_parseBody(struct StateMachine &stateMachine);
 
 	public:
 		~HttpRequest();
 
-		static void processClient(ClientData &client);
+		static void processClient(ClientData &client, const ServerManager &manager);
 };
