@@ -199,7 +199,7 @@ void ServerManager::handleWrite(int clientSocket)
 		if (client.exception.shouldClose())
 			errorResponse.addHeader("Connection", "close");
 		
-		ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), 0);
+		ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), MSG_NOSIGNAL);
 		if (bytesSent < 0)
 		{
 			_logger.logError("Error sending error response to client socket");
@@ -264,7 +264,7 @@ void ServerManager::handleWrite(int clientSocket)
 
 	std::string responseStr = response.toString();
 	_logger.logDebug("Response to client " + to_string(client.clientSocket) + ":\n" + responseStr);
-	ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), 0);
+	ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), MSG_NOSIGNAL);
 	if (bytesSent < 0)	{
 		_logger.logError("Error sending response to client socket");
 		_logger.logDebug("error code: " + to_string(errno));
