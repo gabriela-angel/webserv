@@ -25,22 +25,35 @@ void Logger::init(LogLevel level, const std::string &filePath)
 
 	if (!_logFile.is_open()) throw std::runtime_error("Failed to open " + fullLogPath);
 	std::string levelStr;
+
 	switch (level)
 	{
-	case INFO:
-		levelStr = "[INFO]";
-		break;
-	case ERROR:
-		levelStr = "[ERROR]";
-		break;
-	case DEBUG:	
-		levelStr = "[DEBUG]";
-		break;
-	default:
-		levelStr = "[UNKNOWN]";
-		break;
+		case NO_LOGS:
+			levelStr = "[NO_LOGS]";
+			break;
+		case FATAL:
+			levelStr = "[FATAL]";
+			break;
+		case CRITICAL:
+			levelStr = "[CRITICAL]";
+			break;
+		case ERROR:
+			levelStr = "[ERROR]";
+			break;
+		case WARNING:
+			levelStr = "[WARNING]";
+			break;
+		case INFO:
+			levelStr = "[INFO]";
+			break;
+		case DEBUG:	
+			levelStr = "[DEBUG]";
+			break;
+		default:
+			levelStr = "[UNKNOWN]";
+			break;
 	}
-	logInfo("Logger initialized with log level: " + levelStr);
+	_logAways("Logger initialized with log level: " + levelStr);
 }
 
 void Logger::init(LogLevel level)
@@ -82,10 +95,24 @@ inline static std::string colorizeMessage(const std::string &dateTime, const std
 		coloredSeverity = COLORIZE(BRIGHT_RED, severity);
 	else if (severity == "[FATAL]")
 		coloredSeverity = COLORIZE(BRIGHT_RED, severity);
+	else if (severity == "[NOTICE]")
+		coloredSeverity = COLORIZE(BRIGHT_BLUE, severity);
 	else
 		coloredSeverity = severity;
 
 	return coloredDateTime + " - " + coloredSeverity + " " + message;
+}
+
+void Logger::_logAways(const std::string &message)
+{
+	if (!_initialized) throw std::runtime_error("Logger is not initialized. Call init() before logging.");
+	std::string dateTime = _currentDateTime();
+	std::string severity = "[NOTICE]";
+	std::string logMessage = dateTime + " - " + severity + " " + message;
+	std::string coloredMessage = colorizeMessage(dateTime, severity, message);
+	if (_isTerminal(std::cout))
+		std::cout << coloredMessage << std::endl;
+	_logFile << logMessage << std::endl;
 }
 
 void Logger::logInfo(const std::string &message)

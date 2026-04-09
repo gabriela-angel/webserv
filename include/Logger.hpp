@@ -15,6 +15,7 @@ class Logger
 	// LOG LEVELS
 	enum		LogLevel
 	{
+		NO_LOGS,		// For disabling logging
 		FATAL,			// For very severe error events that will presumably lead the application to abort immediately
 		CRITICAL,		// For severe error events that will presumably lead the application to abort
 		ERROR,			// For error events that might still allow the application to continue running
@@ -40,7 +41,7 @@ class Logger
 	/* Private Methods */
 	static bool _isTerminal(std::ostream &os);
 	static std::string _currentDateTime(void);
-
+	void _logAways(const std::string &message);
   public:
 	// Destructor
 	~Logger();
@@ -59,4 +60,9 @@ class Logger
 	void logError(const std::string &message);
 	void logCritical(const std::string &message);
 	void logFatal(const std::string &message);
+
+	operator bool() const
+	{
+		return _initialized;
+	}
 };
