@@ -548,7 +548,6 @@ const LocationConfig* RequestProcessor::matchLocation(std::string request_uri, c
 
 bool RequestProcessor::isMethodAllowed(const std::string& method, const LocationConfig& location) {
 	const std::vector<std::string>& allowed_methods = location.getMethods();
-	const std::string test = allowed_methods[0];
 	for (size_t i = 0; i < allowed_methods.size(); i++) {
 		//verificar se Luiz ja ta me enviando tudo em uppercase
 		if (allowed_methods[i] == method)

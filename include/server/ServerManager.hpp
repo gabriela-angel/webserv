@@ -80,5 +80,6 @@ class ServerManager
 
   private:
 	std::string						_generateSecureSessionId();
+	bool							_secureSend(int clientSocket, const std::string &data);
 	void							_handleSession(ClientData &client);
 };

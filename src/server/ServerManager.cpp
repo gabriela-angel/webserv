@@ -199,12 +199,10 @@ void ServerManager::handleWrite(int clientSocket)
 		if (client.exception.shouldClose())
 			errorResponse.addHeader("Connection", "close");
 		
-		ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), MSG_NOSIGNAL);
-		if (bytesSent < 0)
+		if (!_secureSend(clientSocket, responseStr))
 		{
-			_logger.logError("Error sending error response to client socket");
-			_logger.logDebug("error code: " + to_string(errno));
-			_logger.logDebug("error message: " + std::string(strerror(errno)));
+			removeClient(clientSocket);
+			return ;
 		}
 
 		if (client.stateMachine.httpData.keepAlive == false)
@@ -263,16 +261,12 @@ void ServerManager::handleWrite(int clientSocket)
 		response.addHeader("Content-Length", to_string(response.getBody().size()));
 
 	std::string responseStr = response.toString();
-	_logger.logDebug("Response to client " + to_string(client.clientSocket) + ":\n" + responseStr);
-	ssize_t bytesSent = send(clientSocket, responseStr.c_str(), responseStr.size(), MSG_NOSIGNAL);
-	if (bytesSent < 0)	{
-		_logger.logError("Error sending response to client socket");
-		_logger.logDebug("error code: " + to_string(errno));
-		_logger.logDebug("error message: " + std::string(strerror(errno)));
+	if (!_secureSend(clientSocket, responseStr))
+	{
 		removeClient(clientSocket);
 		return;
 	}
-	_logger.logInfo("Sent response to client " + to_string(client.clientSocket) + ", bytes sent: " + to_string(bytesSent));
+	
 	if (httpData.keepAlive)
 		_epoll.modifyClient(clientSocket, EPOLLIN);
 	else
@@ -335,4 +329,23 @@ const ServerConfig& ServerManager::findServer(int serverSocket, const std::strin
     if (default_server)
         return *default_server;
     return servers[0];
+}
+
+bool ServerManager::_secureSend(int clientSocket, const std::string &data)
+{
+	size_t total = 0;
+	while (total < data.size()) {
+		ssize_t bytesSent = send(clientSocket, (data.c_str() + total), (data.size() - total), MSG_NOSIGNAL);
+
+		if (bytesSent < 0)	{
+			_logger.logError("Error sending response to client socket");
+			_logger.logDebug("error code: " + to_string(errno));
+			_logger.logDebug("error message: " + std::string(strerror(errno)));
+			return false;
+		}
+		total += bytesSent;
+	}
+	_logger.logDebug("Response to client " + to_string(clientSocket) + ":\n" + data);
+	_logger.logInfo("Sent response to client " + to_string(clientSocket) + ", bytes sent: " + to_string(total));
+	return true;
 }
