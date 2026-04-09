@@ -69,6 +69,7 @@ char** CgiHandler::buildEnv(
 	std::vector<std::string> env_vec;
 
 	env_vec.push_back("GATEWAY_INTERFACE=CGI/1.1");
+	env_vec.push_back("REDIRECT_STATUS=200");
 	env_vec.push_back("SERVER_PROTOCOL=HTTP/1.1");
 	env_vec.push_back("SERVER_SOFTWARE=webserv/1.0");
 	env_vec.push_back("REQUEST_METHOD=" + request.getMethod());
@@ -194,7 +195,6 @@ bool CgiHandler::execute(
 	while ((n = read(stdout_pipe[0], buf, sizeof(buf))) > 0)
 		output.append(buf, static_cast<size_t>(n));
 	close(stdout_pipe[0]);
-
 	// Wait for child and check exit status
 	int status;
 	waitpid(pid, &status, 0);

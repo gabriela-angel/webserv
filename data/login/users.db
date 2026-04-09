@@ -1,0 +1,18 @@
+{
+    "users": {
+        "xluixzczxc": {
+            "password_hash": "$2y$10$WvbDSbLoAAWNxIco4pRA2Ojq\/kcGsf\/Of1ZgdKp2uDTYmNGN9.WXW",
+            "created_at": 1775750176
+        },
+        "test": {
+            "password_hash": "$2y$10$qrA\/QL1pOaU.wMOK9G2MN.04b74JcexUz8llH8TqdFpBmJj26tm6W",
+            "created_at": 1775751123
+        }
+    },
+    "sessions": {
+        "e865577e4e548db67b5a75fc218b85ed": {
+            "username": "test",
+            "last_seen": 1775752403
+        }
+    }
+}

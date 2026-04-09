@@ -207,6 +207,12 @@ void ServerManager::handleWrite(int clientSocket)
 			_logger.logDebug("error message: " + std::string(strerror(errno)));
 		}
 
+		if (client.stateMachine.httpData.keepAlive == false)
+		{
+			removeClient(clientSocket);
+			return ;
+		}
+
 		if (client.exception.shouldClose())
 			removeClient(clientSocket);
 		else
@@ -267,22 +273,10 @@ void ServerManager::handleWrite(int clientSocket)
 		return;
 	}
 	_logger.logInfo("Sent response to client " + to_string(client.clientSocket) + ", bytes sent: " + to_string(bytesSent));
-	_epoll.modifyClient(clientSocket, EPOLLIN);
-	// HttpResponse parseResponse(responseData)
-	// Add Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
-	
-	/*
-		- Session Management
-			- Implement a random feature that uses Sessions (already implemented in clients)
-
-		- Check Exceptions to handle errors
-			- send Response and if shouldClose, remove client
-		- Handle Keep-Alive (Connection: keep-alive)
-
-		- send Response with Set-Cookie: SESSIONID=<value>; Max-Age=MAX_SESSION_INACTIVITY; Path=/; HttpOnly
-	*/
-
-	
+	if (httpData.keepAlive)
+		_epoll.modifyClient(clientSocket, EPOLLIN);
+	else
+		removeClient(clientSocket);
 }
 
 void ServerManager::_handleSession(ClientData &client)

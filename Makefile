@@ -120,7 +120,7 @@ valgrind: all
 	--show-leak-kinds=all -s \
 	--track-origins=yes \
 	--log-file=$(VALGRIND_LOG) \
-	./$(NAME)  config/basic.conf
+	./$(NAME)  config/php.conf
 	@cat $(VALGRIND_LOG)
 
 .PHONY: all clean fclean re valgrind

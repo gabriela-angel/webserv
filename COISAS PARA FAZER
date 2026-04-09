@@ -1,6 +1,6 @@
 BUG AO REMOVER UM PONTO E VIRGULA DE ALGUMA LINHA DO CONFIG
 
-IMPLEMENTAR LOGIN
+parsing inconcistente com root e return
 
 verificar se compensa enviar send aos poucos e ver como isso se relaciona com a velocidade da internet 
 
