@@ -106,7 +106,7 @@ void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& respon
 			return ;
 		}
 
-		response.setStatus(HttpStatus::FORBIDDEN);
+		response.setStatus(HttpStatus::NOT_FOUND);
 		return ;
 	}
 	

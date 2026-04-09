@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/auth_store.php';
+require_once __DIR__ . '/../auth_store.php';
 
 $error = '';
 $sessionId = getSessionIdFromCookie();
