@@ -2,6 +2,4 @@ BUG AO REMOVER UM PONTO E VIRGULA DE ALGUMA LINHA DO CONFIG
 
 parsing inconcistente com root e return
 
-verificar se compensa enviar send aos poucos e ver como isso se relaciona com a velocidade da internet 
-
 rodar ./tester antes da avaliacao
