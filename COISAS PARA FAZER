@@ -1,11 +1,7 @@
 BUG AO REMOVER UM PONTO E VIRGULA DE ALGUMA LINHA DO CONFIG
 
-verificar se default_server esta funcionando
-
-VERIFICAR LEAKS
-
 IMPLEMENTAR LOGIN
 
 verificar se compensa enviar send aos poucos e ver como isso se relaciona com a velocidade da internet 
 
-rodar ./test antes da avaliacao
+rodar ./tester antes da avaliacao
