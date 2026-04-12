@@ -16,8 +16,6 @@ public:
 	ManagerConfig& operator=(const ManagerConfig& other);
 	~ManagerConfig();
 
-	ServerConfig& findServer(int port, const std::string& host_header);
-
 	// DEBUG ONLY
 	const std::vector<ServerConfig>& getServers() const { return _servers; }
 };

@@ -1,4 +1,5 @@
 #include "HttpRequest.hpp"
+#include "RequestProcessor.hpp"
 
 HttpRequest::HttpRequest() {}
 HttpRequest::~HttpRequest() {}
@@ -42,14 +43,13 @@ inline static void fillClientData(ClientData &client) {
 	}
 }
 
-
 /* ---------------------------- Main Functions to Process Client ---------------------------- */
 
-void HttpRequest::processClient(ClientData &client) {
+void HttpRequest::processClient(ClientData &client, const ServerManager &manager) {
     StateMachine &sm = client.stateMachine;
 
     while (sm.state != StateMachine::DONE && sm.state != StateMachine::ERROR) {
-        if (_processClientState(client))
+        if (_processClientState(client, manager))
 		{
 			_logger.logDebug("Client " + to_string(client.clientSocket) + " - Waiting for more data...");
 			break; // if need more data
@@ -62,7 +62,7 @@ void HttpRequest::processClient(ClientData &client) {
 }
 
 // This function will return true if we need to wait for more data
-bool HttpRequest::_processClientState(ClientData &client) {
+bool HttpRequest::_processClientState(ClientData &client, const ServerManager &manager) {
 	StateMachine &stateMachine = client.stateMachine;
 	std::string &buffer = stateMachine.buffer;
 
@@ -93,6 +93,7 @@ bool HttpRequest::_processClientState(ClientData &client) {
 				if (!part.isComplete) return true;
 				_validateRequestLine(stateMachine.httpData.requestLine);
 				_validateHeaders(part.value);
+				_validateMaxBodySize(manager, client, part.value);
 				stateMachine.httpData.headers = part.value;
 				fillClientData(client);
 				
@@ -326,11 +327,6 @@ void HttpRequest::_validateHeaders(const Headers &headers)
 		for (size_t i = 0; i < mainValue.size(); ++i)
 			if (!std::isdigit(static_cast<unsigned char>(mainValue[i])))
 				throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
-		
-		// Convert to long long and check range
-		long long contentLength = from_string<long long>(mainValue);
-		if (contentLength < 0 || contentLength > MAX_BODY_SIZE)
-			throw HttpException(HttpException::ParseError::INVALID_CONTENT_LENGTH);
 
 		// If Content-Length AND Transfer-Encoding is present, it's an error
 		if (hasTransferEncoding)
@@ -460,6 +456,36 @@ void HttpRequest::_validateHeaders(const Headers &headers)
 		throw HttpException(HttpException::ParseError::MISSING_HOST_HEADER);
 }
 
+inline static size_t getBodyMaxSize(const ServerManager &manager, const ClientData &client, const Headers &headers)
+{
+	std::string host = headers.find(HOST)->second[0];
+	const std::string &uri = client.stateMachine.httpData.requestLine.uri;
+	int serverSocket = client.serverSocket;
+
+    size_t colon_pos = host.find(':');
+    if (colon_pos != std::string::npos)
+        host = host.substr(0, colon_pos);
+    
+
+    const ServerConfig& server = manager.findServer(serverSocket, host);
+    const LocationConfig* location = RequestProcessor::matchLocation(uri, server);
+
+    if (location && location->hasMaxBodySize())
+        return location->getClientMaxBodySize();
+    return server.getClientMaxBodySize();
+}
+
+void HttpRequest::_validateMaxBodySize(const ServerManager &manager, const ClientData &client, const Headers &headers)
+{
+	if (headers.hasKey(CONTENT_LENGTH)) {
+		size_t maxBodySize = getBodyMaxSize(manager, client, headers);
+	
+		size_t contentLength = from_string<size_t>(headers.find(CONTENT_LENGTH)->second[0]);
+		if (contentLength > maxBodySize)
+			throw HttpException(HttpException::ParseError::PAYLOAD_TOO_LARGE);
+	}
+}
+
 HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 {
 	const std::string	&buffer = stateMachine.buffer;
@@ -479,13 +505,9 @@ HttpPart<std::string>	HttpRequest::_parseBody(StateMachine &stateMachine)
 	}
 
 /* TRANSFER-ENCODING: chunked */
-	if (httpData.chunkedTransferEncoding) {
-		if (buffer.size() > MAX_BODY_SIZE)
-			throw HttpException(HttpException::ParseError::PAYLOAD_TOO_LARGE);
-		
-		// Implement a ChunkStateMachine to parse the chunked body
-		// update client Activity
-	}
+	// Implement a ChunkStateMachine to parse the chunked body
+	// Validate Body Length while receiving chunks
+	// update client Activity
 
 	HttpPart<std::string> part;
 	part.isComplete = true;

@@ -28,6 +28,7 @@ HttpException::HttpException(ParseError::Type severity) :
 
 HttpStatus::Code HttpException::parseErrorToStatusCode(ParseError::Type severity) {
 	switch (severity) {
+		case ParseError::INVALID_URI:
 		case ParseError::INVALID_CHUNK:
 		case ParseError::MALFORMED_HEADER:
 		case ParseError::HEADERS_TOO_LARGE:
@@ -37,8 +38,6 @@ HttpStatus::Code HttpException::parseErrorToStatusCode(ParseError::Type severity
 		case ParseError::INVALID_TRANSFER_ENCODING:
 			return HttpStatus::BAD_REQUEST;
 
-		case ParseError::INVALID_URI:
-			return HttpStatus::NOT_FOUND;
 		case ParseError::METHOD_NOT_ALLOWED:
 			return HttpStatus::METHOD_NOT_ALLOWED;
 		case ParseError::NOT_IMPLEMENTED:

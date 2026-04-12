@@ -58,8 +58,8 @@ FILES = \
 	$(CONFIG_PATH)ServerConfig.cpp \
 	$(CONFIG_PATH)LocationConfig.cpp \
 	$(CONFIG_PATH)BaseConfig.cpp \
-	$(HTTP_PATH)CgiHandler.cpp \
 	$(HTTP_PATH)RequestProcessor.cpp \
+	$(HTTP_PATH)CgiHandler.cpp \
 
 
 
@@ -120,7 +120,7 @@ valgrind: all
 	--show-leak-kinds=all -s \
 	--track-origins=yes \
 	--log-file=$(VALGRIND_LOG) \
-	./$(NAME)
+	./$(NAME)  config/php.conf
 	@cat $(VALGRIND_LOG)
 
 .PHONY: all clean fclean re valgrind

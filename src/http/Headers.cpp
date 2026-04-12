@@ -15,7 +15,7 @@ Headers& Headers::operator=(const Headers& other) {
 
 /* ------------------------ */
 
-inline static std::string toUpper(const std::string& str) {
+std::string Headers::toUpper(const std::string& str) {
     std::string upper_str;
     for (size_t i = 0; i < str.size(); i++) {
         char c = str[i];
@@ -24,7 +24,7 @@ inline static std::string toUpper(const std::string& str) {
     return upper_str;
 }
 
-inline static std::string TrainCase(const std::string& str) {
+std::string Headers::TrainCase(const std::string& str) {
     std::string train_str;
     bool capitalize = true;
     for (size_t i = 0; i < str.size(); i++) {
@@ -40,6 +40,9 @@ inline static std::string TrainCase(const std::string& str) {
     return train_str;
 }
 
+bool Headers::compare(const std::string& str1, const std::string& str2) {
+    return str1 == toUpper(str2);
+}
 
 void Headers::add(const std::string& key, const std::string& value) {
     // Uppercase the key for case-insensitive matching

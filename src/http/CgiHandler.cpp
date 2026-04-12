@@ -69,13 +69,14 @@ char** CgiHandler::buildEnv(
 	std::vector<std::string> env_vec;
 
 	env_vec.push_back("GATEWAY_INTERFACE=CGI/1.1");
+	env_vec.push_back("REDIRECT_STATUS=200");
 	env_vec.push_back("SERVER_PROTOCOL=HTTP/1.1");
 	env_vec.push_back("SERVER_SOFTWARE=webserv/1.0");
 	env_vec.push_back("REQUEST_METHOD=" + request.getMethod());
 	env_vec.push_back("SCRIPT_FILENAME=" + filepath);
 	env_vec.push_back("SCRIPT_NAME=" + request.getUri());
-	env_vec.push_back("SERVER_PORT=" + intStr(request.getPort()));
-	env_vec.push_back("SERVER_NAME=" + request.getHostHeader());
+	env_vec.push_back("SERVER_PORT=" + to_string(request.getPort()));
+	env_vec.push_back("SERVER_NAME=" + request.getIP());
 
 	// Query string (part of URI after '?')
 	std::string uri = request.getUri();
@@ -102,17 +103,13 @@ char** CgiHandler::buildEnv(
 
 	for (Headers::ConstIterator it = headers.begin(); it != headers.end(); ++it) {
 		// Content-Type is a special case: no HTTP_ prefix
-		if (it->first == "Content-Type") {
+		if (Headers::compare(it->first, "Content-Type")) {
 			env_vec.push_back("CONTENT_TYPE=" + it->second[0]);
 			continue;
 		}
 		// All other headers: uppercase, hyphens to underscores, HTTP_ prefix
-		std::string key = "HTTP_";
-		for (size_t i = 0; i < it->first.size(); i++) {
-			char c = it->first[i];
-			key += (c == '-') ? '_' : static_cast<char>(toupper(c));
-		}
-		env_vec.push_back(key + "=" + it->second[0]);
+		// Note: it->first is already in uppercase
+		env_vec.push_back("HTTP_" + it->first + "=" + it->second[0]);
 	}
 
 	env_vec.push_back("_INTERPRETER=" + interpreter); // informational
@@ -198,7 +195,6 @@ bool CgiHandler::execute(
 	while ((n = read(stdout_pipe[0], buf, sizeof(buf))) > 0)
 		output.append(buf, static_cast<size_t>(n));
 	close(stdout_pipe[0]);
-
 	// Wait for child and check exit status
 	int status;
 	waitpid(pid, &status, 0);

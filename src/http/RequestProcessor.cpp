@@ -28,10 +28,10 @@
 
 #include "./http/RequestProcessor.hpp"
 
-HttpResponse RequestProcessor::process(const HttpStruct& request, ManagerConfig& config) {
+HttpResponse RequestProcessor::process(const HttpStruct& request, const ServerManager& manager) {
 	HttpResponse response;
-	ServerConfig& server = config.findServer(request.getPort(), request.getHostHeader());
-	LocationConfig* location = matchLocation(request.getUri(), server);
+	const ServerConfig& server = manager.findServer(request.getServerSocket(), request.getHostHeader());
+	const LocationConfig* location = matchLocation(request.getUri(), server);
 
 	if (!location) {
 		response.setStatus(HttpStatus::NOT_FOUND);
@@ -71,7 +71,7 @@ HttpResponse RequestProcessor::process(const HttpStruct& request, ManagerConfig&
 
 // METHOD RELATED ---------------------------------------------------------------------------------
 
-void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
 
 	if (isValidDirectory(filepath)) {
@@ -90,16 +90,23 @@ void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& respon
 				if (isValidFile(index_path)) {
 					if (CgiHandler::tryRun(request, response, *location, index_path))
 						return;
-					serveFile(response, index_path, server, location);
+					serveFile(response, index_path);
 					return ;
 				}
 			}
 		}
-		if (location->hasAutoindex() && location->getAutoindex()) {
+		if ((location->hasAutoindex() && location->getAutoindex()) || (server.hasAutoindex() && server.getAutoindex())) {
 			generateAutoindex(response, filepath, request.getUri());
 			return ;
 		}
-		response.setStatus(HttpStatus::FORBIDDEN);
+
+		// Try find index.html
+		if (isValidFile(filepath + "index.html")) {
+			serveFile(response, filepath + "index.html");
+			return ;
+		}
+
+		response.setStatus(HttpStatus::NOT_FOUND);
 		return ;
 	}
 	
@@ -110,31 +117,44 @@ void RequestProcessor::handleGet(const HttpStruct& request, HttpResponse& respon
 
 	if (CgiHandler::tryRun(request, response, *location, filepath))
 		return;
-	serveFile(response, filepath, server, location);
+	serveFile(response, filepath);
 }
 
 
-void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
-	size_t max_body_size = location->hasMaxBodySize()
-		? location->getClientMaxBodySize()
-		: server.getClientMaxBodySize();
-	if (request.getBody().size() > max_body_size) {
-		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
-		return;
+void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
+
+	std::string filepath = resolveFilePath(server, location, request.getUri());
+
+	if (isValidDirectory(filepath)) {
+		if (filepath[filepath.size() - 1] != '/')
+			filepath += '/';
+
+		const std::vector<std::string>* index_files = NULL;
+		if (location->hasIndexFiles())
+			index_files = &location->getIndexFiles();
+		else if (server.hasIndexFiles())
+			index_files = &server.getIndexFiles();
+
+		if (index_files) {
+			for (size_t i = 0; i < index_files->size(); i++) {
+				std::string index_path = filepath + (*index_files)[i];
+				if (isValidFile(index_path) && CgiHandler::tryRun(request, response, *location, index_path))
+					return;
+			}
+		}
 	}
+
+	if (isValidFile(filepath) && CgiHandler::tryRun(request, response, *location, filepath))
+		return;
  
 	const Headers& headers = request.getHeaders();
 	Headers::ConstIterator ct_it = headers.find("Content-Type");
-	if (ct_it != headers.end() && ct_it->second[0].find("multipart/form-data") != std::string::npos) {
+	if (ct_it != headers.end() && !ct_it->second.empty() && ct_it->second[0].find("multipart/form-data") != std::string::npos) {
 		if (handleMultipart(request, response, location))
 			response.setStatus(HttpStatus::CREATED);
 		return;
 	}
- 
-	std::string filepath = resolveFilePath(server, location, request.getUri());
- 
-	if (isValidFile(filepath) && CgiHandler::tryRun(request, response, *location, filepath))
-		return;
+
 	bool file_existed = false;
 	std::string dest = resolvePostDest(request, response, location, filepath, file_existed);
 	if (dest.empty())
@@ -156,7 +176,7 @@ void RequestProcessor::handlePost(const HttpStruct& request, HttpResponse& respo
 	response.addHeader("Content-Type", "text/plain");
 }
  
-void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
 	std::string filepath = resolveFilePath(server, location, request.getUri());
  
 	if (!isValidFile(filepath) && !isValidDirectory(filepath)) {
@@ -198,7 +218,7 @@ void RequestProcessor::handleDelete(const HttpStruct& request, HttpResponse& res
 
 
 // File serving ---------------------------------------------------------------------------------
-void RequestProcessor::serveFile(HttpResponse& response, const std::string& path, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::serveFile(HttpResponse& response, const std::string& path) {
 	if (access(path.c_str(), R_OK) != 0) {
 		response.setStatus(HttpStatus::FORBIDDEN);
 		return ;
@@ -209,16 +229,7 @@ void RequestProcessor::serveFile(HttpResponse& response, const std::string& path
 		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
 		return ;
 	}
-	size_t file_size = static_cast<size_t>(info.st_size);
-	size_t max_body_size;
-	if (location->hasMaxBodySize())
-		max_body_size = location->getClientMaxBodySize();
-	else
-		max_body_size = server.getClientMaxBodySize();
-	if (file_size > max_body_size) {
-		response.setStatus(HttpStatus::CONTENT_TOO_LARGE);
-		return ;
-	}
+	
 	
 	std::ifstream file(path.c_str(), std::ios::binary);
 	if (!file.is_open()) {
@@ -226,6 +237,7 @@ void RequestProcessor::serveFile(HttpResponse& response, const std::string& path
 		return;
 	}
 
+	size_t file_size = static_cast<size_t>(info.st_size);
 	std::string body(file_size, '\0');
 	file.read(&body[0], static_cast<std::streamsize>(file_size));
 	if (!file && !file.eof()) {
@@ -241,50 +253,72 @@ void RequestProcessor::serveFile(HttpResponse& response, const std::string& path
 
 
 // Autoindex ---------------------------------------------------------------------------------
+bool RequestProcessor::compareAutoindexEntry(const AutoindexEntry& a, const AutoindexEntry& b) {
+	if (a.is_dir != b.is_dir)
+		return a.is_dir > b.is_dir;
+	return a.name < b.name;
+}
+
 void RequestProcessor::generateAutoindex(HttpResponse& response, const std::string& dirpath, const std::string& uri) {
 	DIR* dir = opendir(dirpath.c_str());
 	if (!dir) {
 		response.setStatus(HttpStatus::INTERNAL_SERVER_ERROR);
 		return;
 	}
- 
+
 	std::ostringstream html;
 	html << "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\">"
 	     << "<title>Index of " << uri << "</title></head>\n"
 	     << "<body>\n<h1>Index of " << uri << "</h1>\n<hr>\n<pre>\n";
- 
+
+	std::vector<AutoindexEntry> entries;
 	struct dirent* entry;
 	while ((entry = readdir(dir)) != NULL) {
 		std::string name = entry->d_name;
 		if (name == ".")
 			continue;
- 
+
 		std::string fullpath = dirpath + name;
 		struct stat info;
 		std::string display = name;
 		std::string size_str = "-";
- 
+		bool is_dir = false;
+
 		if (stat(fullpath.c_str(), &info) == 0) {
-			if (S_ISDIR(info.st_mode))
+			if (S_ISDIR(info.st_mode)) {
+				is_dir = true;
 				display += "/";
-			else
+			} else {
 				size_str = itoa(static_cast<int>(info.st_size));
+			}
 		}
- 
+
 		std::string href = uri;
-		if (href[href.size() - 1] != '/')
+		if (!href.empty() && href[href.size() - 1] != '/')
 			href += '/';
 		href += name;
-		if (S_ISDIR(info.st_mode))
+		if (is_dir)
 			href += '/';
- 
-		html << "<a href=\"" << href << "\">" << display << "</a>"
-		     << "\t\t" << size_str << "\n";
+
+		std::ostringstream line;
+		line << "<a href=\"" << href << "\">" << display << "</a>"
+		     << "\t\t" << size_str;
+
+		AutoindexEntry item;
+		item.name = name;
+		item.is_dir = is_dir;
+		item.line = line.str();
+		entries.push_back(item);
 	}
 	closedir(dir);
- 
+
+	std::sort(entries.begin(), entries.end(), compareAutoindexEntry);
+
+	for (size_t i = 0; i < entries.size(); ++i)
+		html << entries[i].line << "\n";
+
 	html << "</pre>\n<hr>\n</body>\n</html>\n";
- 
+
 	std::string body = html.str();
 	response.setStatus(HttpStatus::OK);
 	response.setBody(body);
@@ -333,7 +367,7 @@ bool RequestProcessor::writeToFile(const std::string& dest, const std::string& b
 
 // Resolves the destination path for a POST and sets file_existed.
 // Returns an empty string and sets the response status on error.
-std::string RequestProcessor::resolvePostDest(const HttpStruct& request, HttpResponse& response, LocationConfig* location, const std::string& filepath, bool& file_existed) {
+std::string RequestProcessor::resolvePostDest(const HttpStruct& request, HttpResponse& response, const LocationConfig* location, const std::string& filepath, bool& file_existed) {
 	if (isValidDirectory(filepath)) {
 		std::string upload_dir = location->getUpload();
 		if (upload_dir.empty() || !isValidDirectory(upload_dir) || access(upload_dir.c_str(), W_OK) != 0) {
@@ -380,7 +414,7 @@ std::string RequestProcessor::resolvePostDest(const HttpStruct& request, HttpRes
  
 
 // Handles multipart/form-data uploads: parses each part and saves files to upload_dir
-bool RequestProcessor::handleMultipart(const HttpStruct& request, HttpResponse& response, LocationConfig* location) {
+bool RequestProcessor::handleMultipart(const HttpStruct& request, HttpResponse& response, const LocationConfig* location) {
 	const Headers& headers = request.getHeaders();
  
 	std::string upload_dir = location->getUpload();
@@ -484,9 +518,9 @@ bool RequestProcessor::canDelete(const std::string& path) {
 // Routing helpers ---------------------------------------------------------------------------------
 
 
-LocationConfig* RequestProcessor::matchLocation(std::string request_uri, ServerConfig& server) {
+const LocationConfig* RequestProcessor::matchLocation(std::string request_uri, const ServerConfig& server) {
 	unsigned long match_length = 0;
-	LocationConfig* best_match = NULL;
+	const LocationConfig* best_match = NULL;
 
 	// Strip query string before prefix matching
 	size_t q = request_uri.find('?');
@@ -523,7 +557,7 @@ bool RequestProcessor::isMethodAllowed(const std::string& method, const Location
 }
 
 
-std::string RequestProcessor::resolveFilePath(ServerConfig& server, LocationConfig* location, std::string uri) {
+std::string RequestProcessor::resolveFilePath(const ServerConfig& server, const LocationConfig* location, std::string uri) {
 	std::string filepath;
 
 	// Strip query string — it's for CGI env, not the filesystem path
@@ -547,7 +581,7 @@ std::string RequestProcessor::resolveFilePath(ServerConfig& server, LocationConf
 	return filepath;
 }
 
-void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& server, LocationConfig* location) {
+void RequestProcessor::handlePageErrors(HttpResponse& response, const ServerConfig& server, const LocationConfig* location) {
 	const int &status = response.getStatus();
 	
 	typedef std::map<int, std::string>	ErrorPage;
@@ -558,7 +592,10 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& se
 	for (ErrorPageIt it = location_pages.begin(); it != location_pages.end(); ++it) {
 		if (it->first == status) {
 			std::string path = resolveFilePath(server, location, it->second);
-			serveFile(response, path, server, location);
+			HttpResponse newResponse;
+			serveFile(newResponse, path);
+			newResponse.setStatus(HttpStatus::Code(status));
+			response = newResponse;
 			return;
 		}
 	}
@@ -570,7 +607,10 @@ void RequestProcessor::handlePageErrors(HttpResponse& response, ServerConfig& se
 			if (path[0] != '/')
 				path = "/" + path;
 			path = server.getRoot() + path;
-			serveFile(response, path, server, location);
+			HttpResponse newResponse;
+			serveFile(newResponse, path);
+			newResponse.setStatus(HttpStatus::Code(status));
+			response = newResponse;
 			return;
 		}
 	}

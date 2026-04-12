@@ -1,4 +1,5 @@
-#include "./config/BaseConfig.hpp"
+#include "BaseConfig.hpp"
+#include "Http.hpp"
 
 BaseConfig::BaseConfig() {
 	_has_root = false;
@@ -13,7 +14,7 @@ BaseConfig::BaseConfig() {
 	_redirect_code = 0;
 	_redirect_url = "";
 	_has_client_max_body_size = false;
-	_client_max_body_size = DEFAULT_CLIENT_MAX_BODY_SIZE;
+	_client_max_body_size = MAX_BODY_SIZE;
 }
 
 BaseConfig::BaseConfig(const BaseConfig& copy) {
