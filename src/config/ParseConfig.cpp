@@ -39,7 +39,7 @@ std::vector<ServerConfig> ParseConfig::parse() {
 		remainder = trim(remainder);
 		while (!remainder.empty()) {
 			size_t pos = remainder.find_first_of(";{}");
-			if (pos != (remainder.length() - 1)) {
+			if (pos != (remainder.length() - 1) && pos != std::string::npos) {
 				line = remainder.substr(0, pos + 1);
 				remainder = remainder.substr(pos + 1);
 			}
@@ -87,7 +87,7 @@ std::vector<ServerConfig> ParseConfig::parse() {
 				throw std::runtime_error("Each server block must have a root directive");
 		}
 	}
- 
+
 	return servers;
 }
  
@@ -138,7 +138,7 @@ bool ParseConfig::setKeyValue(const std::string& line, std::string& key, std::ve
 		return false;
  
 	iss >> key;
- 
+
 	if (key != "server" && key != "location" && key != "}" && line[line.size() - 1] != ';')
 		throw std::runtime_error("Syntax error: line " + itoa(_line_counter) + ": Missing ';'");
  
@@ -148,7 +148,7 @@ bool ParseConfig::setKeyValue(const std::string& line, std::string& key, std::ve
 		if (!token.empty())
 			value.push_back(token);
 	}
- 
+
 	return true;
 }
  
@@ -172,49 +172,3 @@ void ParseConfig::cutComments(std::string& line) {
 		throw std::runtime_error("Invalid syntax: line " + itoa(_line_counter) + ": Unclosed quote");
 	}
 }
- 
-// Arquivo .conf
-//         ↓
-// ConfigParser
-//         ↓
-// Estruturas em memória
-//         ↓
-// ServerManager (guarda todos os servers)
-//         ↓
-// Request chega
-//         ↓
-// Você usa as estruturas para decidir o que fazer
- 
-// Webserv
-//  ├── vários ServerConfig
-//  │     ├── várias LocationConfig
-//  │
-//  └── (opcional) Config global
- 
-// - [ ] Suporte inicial:
-// 	- porta
-// 	- root
-// 	- index 
-// 	- error_page  
-// - [ ] Validação mínima (config inválido → erro)
- 
-// Se não houver root definido em lugar nenhum:
-// 	erro de configuração.
-// 	500 Internal Server Error
-// if (!server.hasRoot())
-//     throw ConfigError("Server must define a root");
- 
-//VALIDAR:
-// Existe pelo menos 1 server?
-// Cada server tem listen?
-// Cada server tem root? (se você decidiu que é obrigatório)
-// Não há duplicação absurda? -> exemplo:
-	// dois servers com mesma porta e name
-	// dois servers escutando na mesma porta e mesmo host sem lógica clara
-	// duas locations iguais dentro do mesmo server
-	// diretivas repetidas que não deveriam repetir (como dois roots)
- 
-// MANTER EM MENTE QUE O PORT PODE SER:
-// listen 127.0.0.1:8080;
-// OU
-// listen 8080;
