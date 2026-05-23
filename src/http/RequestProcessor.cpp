@@ -1,31 +1,3 @@
-// Quando request chega:
-// Recebe HttpRequest - DONE
-// Descobre o ServerConfig correto (host + port) - DONE
-// Encontra a LocationConfig mais específica (match por prefixo) -DONE
-// Verifica se há redirect - DONE
-// Se sim → resposta 301/302 e para aqui
-// Verifica se o método é permitido - DONE
-// Se não → 405 - DONE
-// Resolve root (location → server fallback) - DONE
-// Constrói path no filesystem - DONE
-// Verificar se é diretório
-// Resolver index
-// Verificar existência
-// Executar GET/POST/DELETE
-// Criar o HttpResponse
-
-// Se o path final aponta para um diretório:
-// Exemplo:
-// GET /images/
-// E o filesystem path é:
-// /var/www/images/
-// Você precisa verificar:
-// Existe um index configurado?
-// Se algum existir → serve esse.
-// Se não:
-// 		Se autoindex on → gera listagem
-//		Senão → 403 ou 404 (dependendo da política)
-
 #include "./http/RequestProcessor.hpp"
 
 HttpResponse RequestProcessor::process(const HttpStruct& request, const ServerManager& manager) {
