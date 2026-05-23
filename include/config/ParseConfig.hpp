@@ -1,18 +1,3 @@
-// Se não houver root definido em lugar nenhum:
-// 	erro de configuração.
-// 	500 Internal Server Error
-// if (!server.hasRoot())
-//     throw ConfigError("Server must define a root");
-
-//VALIDAR:
-// Cada server tem listen?
-// Cada server tem root? (se você decidiu que é obrigatório)
-// Não há duplicação absurda? -> exemplo:
-	// dois servers com mesma porta e name
-	// dois servers escutando na mesma porta e mesmo host sem lógica clara
-	// duas locations iguais dentro do mesmo server
-	// diretivas repetidas que não deveriam repetir (como dois roots)
-
 #ifndef PARSECONFIG_HPP
 # define PARSECONFIG_HPP
 
