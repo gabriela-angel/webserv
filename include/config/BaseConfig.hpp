@@ -13,12 +13,12 @@ class BaseConfig {
 protected:
 	bool						_has_root;
 	std::string 				_root;
-	std::vector<std::string>	_methods;// create enum for methods ?
+	std::vector<std::string>	_methods;
 	bool						_has_autoindex;
 	bool						_autoindex;
 	bool						_has_index_files;
 	std::vector<std::string>	_index_files;
-	std::map<int, std::string>	_error_pages; //if not defined we need to return default ones
+	std::map<int, std::string>	_error_pages;
 	bool						_has_redirect;
 	int							_redirect_code;
 	std::string					_redirect_url;
