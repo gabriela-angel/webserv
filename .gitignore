@@ -1,6 +1,0 @@
-.vscode/
-build/
-logs/
-
-webserv
-valgrind.log
